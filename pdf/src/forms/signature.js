@@ -48,6 +48,45 @@
 		}
 		return value === true || value === 1;
 	}
+	function normalizeSignatureAppearance(value) {
+		if (!value || typeof value !== "object") {
+			return null;
+		}
+
+		let sMode = value["mode"];
+		if (sMode !== "typed" && sMode !== "drawn" && sMode !== "image") {
+			return null;
+		}
+
+		let normalizeText = function(text, limit) {
+			return typeof text === "string" ? text.slice(0, limit) : "";
+		};
+		let oAppearance = {
+			mode: sMode,
+			signedAt: normalizeText(value["signedAt"], 64)
+		};
+
+		if (sMode === "typed") {
+			oAppearance.text = normalizeText(value["text"], 256).trim();
+			if (!oAppearance.text) {
+				return null;
+			}
+
+			let sFontFamily = value["fontFamily"];
+			oAppearance.fontFamily = ["cursive", "serif", "sans-serif"].includes(sFontFamily) ? sFontFamily : "cursive";
+			let sColor = normalizeText(value["color"], 16);
+			oAppearance.color = /^#[0-9a-f]{6}$/i.test(sColor) ? sColor.toLowerCase() : "#202327";
+		}
+		else {
+			let sImage = normalizeText(value["image"] || value["dataUrl"], 2 * 1024 * 1024);
+			if (!/^data:image\/(?:png|jpe?g|webp);base64,[a-z0-9+/=\s]+$/i.test(sImage)) {
+				return null;
+			}
+			oAppearance.image = sImage;
+		}
+
+		return oAppearance;
+	}
 
     /**
 	 * Class representing a signature field.
@@ -82,6 +121,33 @@
 	CSignatureField.prototype.GetValue = function() {
 		return this.IsFilled() ? SIGNED_VALUE : "";
 	};
+	CSignatureField.prototype.GetAppearance = function() {
+		let oMeta = this.GetMeta() || {};
+		return oMeta["signatureAppearance"] || null;
+	};
+	CSignatureField.prototype.SetAppearance = function(value) {
+		let oAppearance = normalizeSignatureAppearance(value);
+		if (!oAppearance) {
+			return false;
+		}
+
+		this.SetValue(true);
+		this.Commit();
+
+		let oDoc = this.GetDocument();
+		let aFields = oDoc && oDoc.GetAllWidgets ? oDoc.GetAllWidgets(this.GetFullName()) : [this];
+		for (let nIndex = 0; nIndex < aFields.length; nIndex++) {
+			let oField = aFields[nIndex];
+			let oMeta = Object.assign({}, oField.GetMeta() || {});
+			oMeta["signatureAppearance"] = Object.assign({}, oAppearance);
+			oField.SetMeta(oMeta);
+			oField.SetWasChanged(true);
+			oField.SetNeedRecalc(true);
+			oField.AddToRedraw();
+		}
+
+		return true;
+	};
     CSignatureField.prototype.Draw = function(oGraphicsPDF, oGraphicsWord) {
 		if (this.IsHidden() && !Asc.editor.IsEditFieldsMode()) {
 			return;
@@ -94,9 +160,69 @@
 
 		this.DrawBackground(oGraphicsPDF);
 		this.DrawBorders(oGraphicsPDF);
+		this.DrawAppearance(oGraphicsPDF);
 		this.DrawLocks(oGraphicsPDF);
 		this.DrawEdit(oGraphicsWord);
     };
+	CSignatureField.prototype.DrawAppearance = function(oGraphicsPDF) {
+		let oAppearance = this.GetAppearance();
+		if (!oAppearance || !oGraphicsPDF || !window.document) {
+			return;
+		}
+
+		let aRect = this.GetRect();
+		let nWidth = Math.max(aRect[2] - aRect[0], 1);
+		let nHeight = Math.max(aRect[3] - aRect[1], 1);
+		let oTransform = oGraphicsPDF.GetTransform ? oGraphicsPDF.GetTransform() : null;
+		let nScale = Math.max(Math.abs(oTransform && oTransform.sy || 1), 1);
+		let oCanvas = window.document.createElement("canvas");
+		oCanvas.width = Math.min(Math.max(Math.round(nWidth * nScale), 1), 4096);
+		oCanvas.height = Math.min(Math.max(Math.round(nHeight * nScale), 1), 4096);
+		let oContext = oCanvas.getContext("2d");
+		if (!oContext) {
+			return;
+		}
+		oContext.clearRect(0, 0, oCanvas.width, oCanvas.height);
+
+		if (oAppearance.mode === "typed") {
+			oContext.fillStyle = oAppearance.color;
+			oContext.textAlign = "center";
+			oContext.textBaseline = "middle";
+			oContext.font = Math.max(Math.floor(oCanvas.height * 0.55), 12) + "px " + oAppearance.fontFamily;
+			oContext.fillText(oAppearance.text, oCanvas.width / 2, oCanvas.height / 2, Math.max(oCanvas.width - 16, 1));
+		}
+		else {
+			let oImage = this._signatureAppearanceImage;
+			if (!oImage || oImage._signatureSource !== oAppearance.image) {
+				oImage = new window.Image();
+				oImage._signatureSource = oAppearance.image;
+				oImage.onload = function() {
+					this.AddToRedraw();
+				}.bind(this);
+				oImage.onerror = function() {
+					if (this._signatureAppearanceImage === oImage) {
+						this._signatureAppearanceImage = null;
+					}
+				}.bind(this);
+				this._signatureAppearanceImage = oImage;
+				oImage.src = oAppearance.image;
+			}
+			if (!oImage.complete || !(oImage.naturalWidth || oImage.width) || !(oImage.naturalHeight || oImage.height)) {
+				return;
+			}
+
+			let nImageWidth = oImage.naturalWidth || oImage.width;
+			let nImageHeight = oImage.naturalHeight || oImage.height;
+			let nImageScale = Math.min(oCanvas.width / nImageWidth, oCanvas.height / nImageHeight);
+			let nDrawWidth = nImageWidth * nImageScale;
+			let nDrawHeight = nImageHeight * nImageScale;
+			oContext.drawImage(oImage, (oCanvas.width - nDrawWidth) / 2, (oCanvas.height - nDrawHeight) / 2, nDrawWidth, nDrawHeight);
+		}
+
+		oGraphicsPDF.SetIntegerGrid(true);
+		oGraphicsPDF.DrawImageXY(oCanvas, aRect[0], aRect[1], undefined, true);
+		oGraphicsPDF.SetIntegerGrid(false);
+	};
     CSignatureField.prototype.DrawPressed = function() {
 		if (this.IsReadOnly()) {
 			return;
@@ -237,6 +363,7 @@
 		oInfo.page = this.GetPage();
 		oInfo.rect = this.GetRect().slice();
 		oInfo.isForm = true;
+		oInfo.appearance = this.GetAppearance();
 		return oInfo;
 	};
 	
@@ -285,5 +412,7 @@
     window["AscPDF"].CSignatureField = CSignatureField;
 	window["AscPDF"].CSignatureField.prototype["asc_GetValue"] = CSignatureField.prototype.GetValue;
 	window["AscPDF"].CSignatureField.prototype["asc_IsFilled"] = CSignatureField.prototype.IsFilled;
+	window["AscPDF"].CSignatureField.prototype["asc_GetAppearance"] = CSignatureField.prototype.GetAppearance;
+	window["AscPDF"].CSignatureField.prototype["asc_SetAppearance"] = CSignatureField.prototype.SetAppearance;
 })();
 
