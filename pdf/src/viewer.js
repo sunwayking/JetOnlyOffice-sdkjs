@@ -3296,8 +3296,8 @@
 					
 					this.onUpdateOverlay();
 
-					if (this.fullTextMessageCallbackArgs[4])
-						this.fullTextMessageCallbackArgs[4].call(this.Api, nCurrentMatch, oSearchEnginge.Count);
+					if (this.fullTextMessageCallbackArgs[2])
+						this.fullTextMessageCallbackArgs[2].call(this.Api, nCurrentMatch, oSearchEnginge.Count);
 				};
 				this.showTextMessage();
 				return true; // async
