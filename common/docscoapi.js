@@ -107,6 +107,9 @@
       this._CoAuthoringApi.onConnectionStateChanged = function(e) {
         t.callback_OnConnectionStateChanged(e);
       };
+      this._CoAuthoringApi.onTransportStateChanged = function(e) {
+        t.callback_OnTransportStateChanged(e);
+      };
       this._CoAuthoringApi.onSetIndexUser = function(e) {
         t.callback_OnSetIndexUser(e);
       };
@@ -128,6 +131,12 @@
       };
       this._CoAuthoringApi.onUnSaveLock = function() {
         t.callback_OnUnSaveLock();
+      };
+      this._CoAuthoringApi.onServerSaveConfirmed = function(e) {
+        t.callback_OnServerSaveConfirmed(e);
+      };
+      this._CoAuthoringApi.onServerSaveStateChanged = function(e) {
+        t.callback_OnServerSaveStateChanged(e);
       };
       this._CoAuthoringApi.onRecalcLocks = function(e) {
         t.callback_OnRecalcLocks(e);
@@ -489,6 +498,12 @@
     }
   };
 
+  CDocsCoApi.prototype.callback_OnTransportStateChanged = function(e) {
+    if (this.onTransportStateChanged) {
+      this.onTransportStateChanged(e);
+    }
+  };
+
   CDocsCoApi.prototype.callback_OnSetIndexUser = function(e) {
     if (this.onSetIndexUser) {
       this.onSetIndexUser(e);
@@ -524,6 +539,18 @@
   CDocsCoApi.prototype.callback_OnUnSaveLock = function() {
     if (this.onUnSaveLock) {
       this.onUnSaveLock();
+    }
+  };
+
+  CDocsCoApi.prototype.callback_OnServerSaveConfirmed = function(e) {
+    if (this.onServerSaveConfirmed) {
+      this.onServerSaveConfirmed(e);
+    }
+  };
+
+  CDocsCoApi.prototype.callback_OnServerSaveStateChanged = function(e) {
+    if (this.onServerSaveStateChanged) {
+      this.onServerSaveStateChanged(e);
     }
   };
 
@@ -661,7 +688,46 @@
     this._saveChangesChunks = [];
     this._authChanges = [];
     this._authOtherChanges = [];
+    this._transportSequence = 0;
+    this._saveConfirmationSequence = 0;
+    this._saveStateSequence = 0;
   }
+
+  DocsCoApi.prototype._emitTransportState = function(state, details) {
+    if (!this.onTransportStateChanged) {
+      return;
+    }
+    var fact = {
+      state: state,
+      sequence: ++this._transportSequence
+    };
+    if (details) {
+      for (var key in details) {
+        if (details.hasOwnProperty(key)) {
+          fact[key] = details[key];
+        }
+      }
+    }
+    this.onTransportStateChanged(fact);
+  };
+
+  DocsCoApi.prototype._emitServerSaveState = function(state, details) {
+    if (!this.onServerSaveStateChanged) {
+      return;
+    }
+    var fact = {
+      state: state,
+      sequence: ++this._saveStateSequence
+    };
+    if (details) {
+      for (var key in details) {
+        if (details.hasOwnProperty(key)) {
+          fact[key] = details[key];
+        }
+      }
+    }
+    this.onServerSaveStateChanged(fact);
+  };
 
   DocsCoApi.prototype.isRightURL = function() {
     return ("" != this._url);
@@ -846,6 +912,7 @@
   };
 
   DocsCoApi.prototype.saveChanges = function(arrayChanges, currentIndex, deleteIndex, excelAdditionalInfo, reSave) {
+    var isInitialSaveBatch = null === currentIndex;
     if (null === currentIndex) {
       this.deleteIndex = deleteIndex;
       if (null != this.deleteIndex && -1 !== this.deleteIndex) {
@@ -881,6 +948,11 @@
 
     // Set save state
     this._state = ConnectionState.SaveChanges;
+    if (reSave) {
+      this._emitServerSaveState('retrying', {reason: reSave});
+    } else if (isInitialSaveBatch) {
+      this._emitServerSaveState('saving');
+    }
     // Credit all bytes of this save operation upfront on the first batch (not per-batch),
     // so localSize + serverSize stays accurate while batches 2..N are sent asynchronously.
     if (!reSave && startIndex === 0) {
@@ -1297,6 +1369,22 @@
     if (undefined !== data['syncChangesIndex'] && -1 !== data['syncChangesIndex']) {
       this.syncChangesIndex = data['syncChangesIndex'];
     }
+
+    var confirmation = {
+        changesIndex: this.changesIndex,
+        syncChangesIndex: this.syncChangesIndex,
+        time: this.lastOwnSaveTime,
+        sequence: ++this._saveConfirmationSequence
+    };
+    this._emitServerSaveState('confirmed', {
+      changesIndex: confirmation.changesIndex,
+      syncChangesIndex: confirmation.syncChangesIndex,
+      time: confirmation.time,
+      confirmationSequence: confirmation.sequence
+    });
+    if (this.onServerSaveConfirmed) {
+      this.onServerSaveConfirmed(confirmation);
+    }
 	
     if (this.onUnSaveLock) {
       this.onUnSaveLock();
@@ -1516,11 +1604,13 @@
     this._onRefreshToken(data['jwt']);
     if (true === this._isAuth) {
       this._state = ConnectionState.Authorized;
+      this._emitTransportState('reconciling', {reconnected: true});
 
       this._onServerVersion(data);
 
       // Only connect to get file. Co-editing already disabled.
       if (this.isCloseCoAuthoring) {
+        this._emitTransportState('connected', {reconnected: true});
         return;
       }
 
@@ -1536,6 +1626,8 @@
 
       //Apply prebuffered
       this._applyPrebuffered();
+
+      this._emitTransportState('connected', {reconnected: true});
 
       if (this._isReSaveAfterAuth) {
         this._isReSaveAfterAuth = false;
@@ -1607,6 +1699,7 @@
 
       //Send prebuffered
       this._sendPrebuffered();
+      this._emitTransportState('connected', {reconnected: false});
     }
     //TODO: Add errors
   };
@@ -1777,6 +1870,7 @@
       var t = this;
       let socket;
       let firstConnection = true;
+      this._emitTransportState('connecting', {reconnecting: this._isAuth === true});
       let options = {
         "path": this.socketio_url,
         "transports": ["websocket", "polling"],
@@ -1849,6 +1943,7 @@
 
 	DocsCoApi.prototype._onServerOpen = function () {
 		this._state = ConnectionState.WaitAuth;
+		this._emitTransportState('authenticating', {reconnecting: this._isAuth === true});
 		this.onFirstConnect();
 	};
 	DocsCoApi.prototype._onServerMessage = function (data) {
@@ -1937,6 +2032,9 @@
 	};
 	DocsCoApi.prototype._onServerClose = function (explicit) {
 		if (ConnectionState.SaveChanges === this._state) {
+			this._emitServerSaveState(explicit ? 'blocking-failed' : 'retryable-failed', {
+				reason: explicit ? 'transport-closed' : 'transport-lost'
+			});
 			// Connection lost during save
 			this._isReSaveAfterAuth = true;
 			// Clear the previous timer
@@ -1947,8 +2045,10 @@
 		}
 		if (explicit) {
 			this._state = ConnectionState.ClosedAll;
+			this._emitTransportState('closed', {explicit: true});
 		} else {
 			this._state = ConnectionState.Reconnect;
+			this._emitTransportState('reconnecting', {explicit: false});
 		}
 	};
   //----------------------------------------------------------export----------------------------------------------------
