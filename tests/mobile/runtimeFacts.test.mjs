@@ -88,6 +88,20 @@ test('unSaveLock publishes one coauthoring-server acceptance fact after applying
     ]);
 });
 
+test('unlock without a pending save does not publish a server-save acceptance fact', () => {
+    const api = createDocsCoApi();
+    const states = [];
+    api.onServerSaveStateChanged = fact => states.push({...fact});
+    api._CoAuthoringApi.onServerSaveStateChanged = fact => api.callback_OnServerSaveStateChanged(fact);
+    api._CoAuthoringApi._sendBufferedLocks = () => {};
+    api._CoAuthoringApi._send = () => {};
+
+    api._CoAuthoringApi.unLockDocument(false);
+    api._CoAuthoringApi._onUnSaveLock({index: 7, syncChangesIndex: 9, time: 42});
+
+    assert.deepEqual(states, []);
+});
+
 test('initial collaboration phases bracket application of server changes', () => {
     const api = createDocsCoApi();
     const events = [];

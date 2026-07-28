@@ -691,6 +691,7 @@
     this._authOtherChanges = [];
     this._transportSequence = 0;
     this._saveStateSequence = 0;
+    this._hasPendingServerSave = false;
   }
 
   function createSequencedFact(owner, sequenceProperty, valueProperty, value, details) {
@@ -909,6 +910,7 @@
   };
 
   DocsCoApi.prototype.saveChanges = function(arrayChanges, currentIndex, deleteIndex, excelAdditionalInfo, reSave) {
+    this._hasPendingServerSave = true;
     var isInitialSaveBatch = null === currentIndex;
     if (null === currentIndex) {
       this.deleteIndex = deleteIndex;
@@ -1338,6 +1340,9 @@
 	};
 
   DocsCoApi.prototype._onUnSaveLock = function(data) {
+    var hasPendingServerSave = this._hasPendingServerSave;
+    this._hasPendingServerSave = false;
+
     // Clear the previous save timer
     if (null !== this.saveCallbackErrorTimeOutId) {
       clearTimeout(this.saveCallbackErrorTimeOutId);
@@ -1367,13 +1372,15 @@
       this.syncChangesIndex = data['syncChangesIndex'];
     }
 
-    // This acknowledges the coauthoring change index; host callback persistence is separate.
-    this._emitServerSaveState('accepted', {
-      scope: 'coauthoring-server',
-      changesIndex: this.changesIndex,
-      syncChangesIndex: this.syncChangesIndex,
-      time: this.lastOwnSaveTime
-    });
+    if (hasPendingServerSave) {
+      // This acknowledges the coauthoring change index; host callback persistence is separate.
+      this._emitServerSaveState('accepted', {
+        scope: 'coauthoring-server',
+        changesIndex: this.changesIndex,
+        syncChangesIndex: this.syncChangesIndex,
+        time: this.lastOwnSaveTime
+      });
+    }
 	
     if (this.onUnSaveLock) {
       this.onUnSaveLock();
