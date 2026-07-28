@@ -1668,6 +1668,39 @@
 			return true;
 		}, AscDFH.historydescription_Pdf_AddField, this);
 	};
+	PDFEditorApi.prototype.AddSignatureField = function(oParams) {
+		let oDoc = this.getPDFDoc();
+		if (!oDoc) {
+			return false;
+		}
+
+		let bAdded = oDoc.DoAction(function() {
+			let oField = oDoc.CreateSignatureField(oParams);
+			oDoc.AddField(oField, oDoc.GetCurPage(), true);
+			return true;
+		}, AscDFH.historydescription_Pdf_AddField, this);
+		if (bAdded) {
+			this.sendEvent("asc_onUpdateSignatureFields", this.asc_getSignatureFields());
+			this.sendEvent("asc_onUpdateSignatures", this.asc_getSignatures(), this.asc_getRequestSignatures());
+		}
+		return bAdded;
+	};
+	PDFEditorApi.prototype.asc_ClearAllSpecialForms = function() {
+		let oDoc = this.getPDFDoc();
+		if (!oDoc) {
+			return false;
+		}
+
+		let bReset = oDoc.DoAction(function() {
+			oDoc.ResetForms([], false);
+			return true;
+		}, AscDFH.historydescription_Document_ClearAllSpecialForms, this);
+		if (bReset) {
+			this.sendEvent("asc_onUpdateSignatureFields", this.asc_getSignatureFields());
+			this.sendEvent("asc_onUpdateSignatures", this.asc_getSignatures(), this.asc_getRequestSignatures());
+		}
+		return bReset;
+	};
 	// fields formats
 	PDFEditorApi.prototype.asc_getNumberFormatCurrencySymbols = function () {
 		let symbolsSet = new Set();
@@ -3601,12 +3634,15 @@
 
 		return [[oPos0.X, oPos0.Y], [oPos1.X, oPos1.Y], [oPos2.X, oPos2.Y], [oPos3.X, oPos3.Y]];
 	};
-	PDFEditorApi.prototype.asc_getAllSignatures = function() {
+	PDFEditorApi.prototype.asc_getSignatureFields = function() {
 		let oDoc = this.getPDFDoc();
-		return oDoc ? oDoc.GetAllSignatures() : [];
+		return oDoc ? oDoc.GetSignatureFields() : [];
+	};
+	PDFEditorApi.prototype.asc_getAllSignatures = function() {
+		return this.asc_getSignatureFields();
 	};
 	PDFEditorApi.prototype.asc_getRequestSignatures = function() {
-		let aSignatures = this.asc_getAllSignatures();
+		let aSignatures = this.asc_getSignatureFields();
 		let aRequested = [];
 		let aDocumentSignatures = this.signatures || [];
 
@@ -3639,6 +3675,30 @@
 		}
 
 		return aRequested;
+	};
+	PDFEditorApi.prototype.asc_SetSignatureFieldAppearance = function(oAppearance) {
+		if (!oAppearance || typeof oAppearance !== "object") {
+			return false;
+		}
+
+		let sFieldId = oAppearance["fieldId"] || oAppearance["id"] || oAppearance["guid"];
+		let oDoc = this.getPDFDoc();
+		if (!oDoc || !oDoc.IsSignatureAppearancePersistenceSupported || !oDoc.IsSignatureAppearancePersistenceSupported()) {
+			return false;
+		}
+		let oField = typeof sFieldId === "string" && oDoc ? oDoc.GetField(sFieldId) : null;
+		if (!oField || oField.GetType() !== AscPDF.FIELD_TYPES.signature || typeof oField.SetAppearance !== "function") {
+			return false;
+		}
+
+		let bApplied = oDoc.DoAction(function() {
+			return oField.SetAppearance(oAppearance);
+		}, AscDFH.historydescription_Pdf_FieldCommit, this);
+		if (bApplied) {
+			this.sendEvent("asc_onUpdateSignatureFields", this.asc_getSignatureFields());
+			this.sendEvent("asc_onUpdateSignatures", this.asc_getSignatures(), this.asc_getRequestSignatures());
+		}
+		return bApplied;
 	};
 
 	PDFEditorApi.prototype.getPluginContextMenuInfo = function () {
@@ -5510,6 +5570,8 @@
 	PDFEditorApi.prototype['AddRadiobuttonField']		= PDFEditorApi.prototype.AddRadiobuttonField;
 	PDFEditorApi.prototype['AddComboboxField']			= PDFEditorApi.prototype.AddComboboxField;
 	PDFEditorApi.prototype['AddListboxField']			= PDFEditorApi.prototype.AddListboxField;
+	PDFEditorApi.prototype['AddSignatureField']			= PDFEditorApi.prototype.AddSignatureField;
+	PDFEditorApi.prototype['asc_ClearAllSpecialForms']	= PDFEditorApi.prototype.asc_ClearAllSpecialForms;
 	PDFEditorApi.prototype['asc_getNumberFormatCurrencySymbols']= PDFEditorApi.prototype.asc_getNumberFormatCurrencySymbols;
 	PDFEditorApi.prototype['asc_getFieldNumberFormatExample']	= PDFEditorApi.prototype.asc_getFieldNumberFormatExample;
 	PDFEditorApi.prototype['asc_getFieldPercentFormatExample']	= PDFEditorApi.prototype.asc_getFieldPercentFormatExample;
@@ -5613,8 +5675,10 @@
 	PDFEditorApi.prototype['remTable']						= PDFEditorApi.prototype.remTable;
 	PDFEditorApi.prototype['asc_getTableStylesPreviews']	= PDFEditorApi.prototype.asc_getTableStylesPreviews;
 	PDFEditorApi.prototype['asc_GetSelectionBounds']		= PDFEditorApi.prototype.asc_GetSelectionBounds;
+	PDFEditorApi.prototype['asc_getSignatureFields']	= PDFEditorApi.prototype.asc_getSignatureFields;
 	PDFEditorApi.prototype['asc_getAllSignatures']		= PDFEditorApi.prototype.asc_getAllSignatures;
 	PDFEditorApi.prototype['asc_getRequestSignatures']	= PDFEditorApi.prototype.asc_getRequestSignatures;
+	PDFEditorApi.prototype['asc_SetSignatureFieldAppearance'] = PDFEditorApi.prototype.asc_SetSignatureFieldAppearance;
 	PDFEditorApi.prototype['asc_setPdfViewer']		        = PDFEditorApi.prototype.asc_setPdfViewer;
 
 	PDFEditorApi.prototype['asc_GetTableOfContentsPr']      = PDFEditorApi.prototype.asc_GetTableOfContentsPr;

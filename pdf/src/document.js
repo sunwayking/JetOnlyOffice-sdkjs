@@ -722,6 +722,32 @@ var CPresentation = CPresentation || function(){};
 
         return oListboxField;
     };
+    CPDFDoc.prototype.CreateSignatureField = function(oParams) {
+        oParams = oParams || {};
+
+        let x1 = 10, y1 = 10;
+        let width = 120, height = 36;
+        let rect = [x1, y1, x1 + width, y1 + height];
+        let sName = this.CreateNewFieldName(AscPDF.FIELD_TYPES.signature);
+        let oSignatureField = this.CreateField(sName, AscPDF.FIELD_TYPES.signature, rect);
+        let normalizeText = function(value) {
+            return typeof value === "string" ? value.slice(0, 256) : "";
+        };
+
+        oSignatureField.SetMeta({
+            signer: normalizeText(oParams["signer"]),
+            signer2: normalizeText(oParams["signer2"]),
+            email: normalizeText(oParams["email"]),
+            instructions: normalizeText(oParams["instructions"]),
+            showDate: !!oParams["showDate"],
+            signatureId: normalizeText(oParams["signatureId"]) || sName
+        });
+        oSignatureField.SetBorderColor([0]);
+        oSignatureField.SetBorderStyle(AscPDF.BORDER_TYPES.solid);
+        oSignatureField.SetBorderWidth(1);
+
+        return oSignatureField;
+    };
     CPDFDoc.prototype.SetLocalHistory = function() {
         AscCommon.History = this.LocalHistory;
     };
@@ -9157,7 +9183,7 @@ var CPresentation = CPresentation || function(){};
 		
 		return false;
 	};
-    CPDFDoc.prototype.GetAllSignatures = function() {
+    CPDFDoc.prototype.GetSignatureFields = function() {
         let aSignatures = [];
         let oSeen = Object.create(null);
 
@@ -9177,6 +9203,14 @@ var CPresentation = CPresentation || function(){};
         }
 
         return aSignatures;
+    };
+    CPDFDoc.prototype.GetAllSignatures = function() {
+        return this.GetSignatureFields();
+    };
+    CPDFDoc.prototype.IsSignatureAppearancePersistenceSupported = function() {
+        let oNativeFile = this.Viewer && this.Viewer.file && this.Viewer.file.nativeFile;
+        return !!(oNativeFile && typeof oNativeFile["isSignatureAppearanceSupported"] === "function" &&
+            oNativeFile["isSignatureAppearanceSupported"]());
     };
     CPDFDoc.prototype.GetCursorRealPosition = function() {
         return {
@@ -9215,6 +9249,9 @@ var CPresentation = CPresentation || function(){};
         let oTextController = this.getTextController();
         let oContent = oTextController && oTextController.GetDocContent ? oTextController.GetDocContent() : null;
         let oBounds = oContent && oContent.GetSelectionBounds ? oContent.GetSelectionBounds() : null;
+        if ((!oBounds || !oBounds.Start || !oBounds.End) && this.Viewer && this.Viewer.file && this.Viewer.file.getSelectionBounds) {
+            oBounds = this.Viewer.file.getSelectionBounds();
+        }
         if (!oBounds || !oBounds.Start || !oBounds.End) {
             return null;
         }

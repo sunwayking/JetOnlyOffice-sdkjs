@@ -76,64 +76,16 @@
 	CTextSelectTrackHandler.prototype.GetBounds = function() {
 		let oViewer		= Asc.editor.getDocumentRenderer();
 		let oFile		= oViewer.file;
-		let aSelQuads	= oFile.getSelectionQuads();
+		let oBounds		= oFile.getSelectionBounds ? oFile.getSelectionBounds() : null;
 
-		if (aSelQuads.length == 0) {
+		if (!oBounds || !oBounds.Start || !oBounds.End) {
 			return null;
 		}
 
-		let nFirstPage		= aSelQuads[0].page;
-		let aFirstQuads		= aSelQuads[0].quads[0];
-		let aMaxFirstRect	= [aFirstQuads[0], aFirstQuads[1], aFirstQuads[6], aFirstQuads[7]]; // x1, y1, x2, y2
-
-		aSelQuads[0].quads.forEach(function(quads) {
-			if (aMaxFirstRect[0] > quads[0]) {
-				aMaxFirstRect[0] = quads[0];
-			}
-			if (aMaxFirstRect[1] > quads[1]) {
-				aMaxFirstRect[1] = quads[1];
-			}
-			if (aMaxFirstRect[2] < quads[6]) {
-				aMaxFirstRect[2] = quads[6];
-			}
-			if (aMaxFirstRect[3] < quads[7]) {
-				aMaxFirstRect[3] = quads[7];
-			}
-		});
-
-		let nLastPage		= aSelQuads[aSelQuads.length - 1].page;
-		let aLastQuads		= aSelQuads[aSelQuads.length - 1].quads[0];
-		let aMaxLastRect	= [aLastQuads[0], aLastQuads[1], aLastQuads[6], aLastQuads[7]]; // x1, y1, x2, y2
-
-		aSelQuads[aSelQuads.length - 1].quads.forEach(function(quads) {
-			if (aMaxLastRect[0] > quads[0]) {
-				aMaxLastRect[0] = quads[0];
-			}
-			if (aMaxLastRect[1] > quads[1]) {
-				aMaxLastRect[1] = quads[1];
-			}
-			if (aMaxLastRect[2] < quads[6]) {
-				aMaxLastRect[2] = quads[6];
-			}
-			if (aMaxLastRect[3] < quads[7]) {
-				aMaxLastRect[3] = quads[7];
-			}
-		});
-
-		let oDoc    	= oViewer.getPDFDoc();
-		let oFirtsTr	= oDoc.pagesTransform[nFirstPage].invert;
-		let oLastTr     = oDoc.pagesTransform[nLastPage].invert;
-
-		let oFirstPoint1 = oFirtsTr.TransformPoint(aMaxFirstRect[0], aMaxFirstRect[1]);
-		let oFirstPoint2 = oFirtsTr.TransformPoint(aMaxFirstRect[2], aMaxFirstRect[3]);
-		
-		let oLastPoint1 = oLastTr.TransformPoint(aMaxLastRect[0], aMaxLastRect[1]);
-		let oLastPoint2 = oLastTr.TransformPoint(aMaxLastRect[2], aMaxLastRect[3]);
-
-		let x1 = Math.min(oFirstPoint1.x, oFirstPoint2.x, oLastPoint1.x, oLastPoint2.x);
-		let x2 = Math.max(oFirstPoint1.x, oFirstPoint2.x, oLastPoint1.x, oLastPoint2.x);
-		let y1 = Math.min(oFirstPoint1.y, oFirstPoint2.y, oLastPoint1.y, oLastPoint2.y);
-		let y2 = Math.max(oFirstPoint1.y, oFirstPoint2.y, oLastPoint1.y, oLastPoint2.y);
+		let x1 = Math.min(oBounds.Start.X, oBounds.End.X);
+		let x2 = Math.max(oBounds.Start.X + oBounds.Start.W, oBounds.End.X + oBounds.End.W);
+		let y1 = Math.min(oBounds.Start.Y, oBounds.End.Y);
+		let y2 = Math.max(oBounds.Start.Y + oBounds.Start.H, oBounds.End.Y + oBounds.End.H);
 
 		return [x1, y1, x2, y2];
 	};

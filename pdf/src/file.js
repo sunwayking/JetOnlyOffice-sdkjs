@@ -1255,6 +1255,65 @@ void main() {\n\
         this.cacheSelectionQuads(aInfo);
         return aInfo;
     };
+    CFile.prototype.getSelectionBounds = function() {
+        if (!this.isSelectionUse()) {
+            return null;
+        }
+
+        let aSelectionQuads = this.getSelectionQuads();
+        if (!aSelectionQuads.length || !this.viewer || !this.viewer.getPDFDoc) {
+            return null;
+        }
+
+        let oDoc = this.viewer.getPDFDoc();
+        let getPageBounds = function(oSelectionPage) {
+            let nPage = oSelectionPage && oSelectionPage.page;
+            let aQuads = oSelectionPage && oSelectionPage.quads;
+            let oPageTransform = oDoc && oDoc.pagesTransform && oDoc.pagesTransform[nPage];
+            let oTransform = oPageTransform && oPageTransform.invert;
+            if (!Array.isArray(aQuads) || !aQuads.length || !oTransform || !oTransform.TransformPoint) {
+                return null;
+            }
+
+            let xMin = Infinity;
+            let yMin = Infinity;
+            let xMax = -Infinity;
+            let yMax = -Infinity;
+            for (let nQuad = 0; nQuad < aQuads.length; nQuad++) {
+                let aQuad = aQuads[nQuad];
+                if (!Array.isArray(aQuad) || aQuad.length < 8) {
+                    continue;
+                }
+
+                for (let nPoint = 0; nPoint < 8; nPoint += 2) {
+                    let oPoint = oTransform.TransformPoint(aQuad[nPoint], aQuad[nPoint + 1]);
+                    if (!oPoint || !Number.isFinite(oPoint.x) || !Number.isFinite(oPoint.y)) {
+                        continue;
+                    }
+                    xMin = Math.min(xMin, oPoint.x);
+                    yMin = Math.min(yMin, oPoint.y);
+                    xMax = Math.max(xMax, oPoint.x);
+                    yMax = Math.max(yMax, oPoint.y);
+                }
+            }
+
+            if (!Number.isFinite(xMin) || !Number.isFinite(yMin) || !Number.isFinite(xMax) || !Number.isFinite(yMax)) {
+                return null;
+            }
+
+            return {
+                X: xMin,
+                Y: yMin,
+                W: xMax - xMin,
+                H: yMax - yMin,
+                Page: nPage
+            };
+        };
+
+        let oStart = getPageBounds(aSelectionQuads[0]);
+        let oEnd = getPageBounds(aSelectionQuads[aSelectionQuads.length - 1]);
+        return oStart && oEnd ? {Start: oStart, End: oEnd} : null;
+    };
     CFile.prototype.drawSelection = function(pageIndex, overlay, x, y)
     {
         if ((Asc.editor.IsRedactTool() || Asc.editor.IsLinkTool()) && this.Selection.startPoint && this.Selection.endPoint) {

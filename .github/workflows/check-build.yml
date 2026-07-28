@@ -49,7 +49,9 @@ jobs:
           node --check common/docscoapi.js
           node --check pdf/api.js
           node --check pdf/src/document.js
+          node --check pdf/src/file.js
           node --check pdf/src/forms/signature.js
+          node --check pdf/src/textSelectTrackHandler.js
           node --check word/api.js
 
       - name: Run locked Mobile contract tests
