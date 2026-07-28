@@ -221,6 +221,36 @@ test('PDF selection API converts real bounds, including a rotated text transform
     ]);
 });
 
+test('PDF form insertion points stay inside the visible page for every rotation', () => {
+    const rotations = new Map([
+        [0, {x: 90, y: 100}],
+        [90, {x: 40, y: 145}],
+        [180, {x: 90, y: 190}],
+        [270, {x: 140, y: 145}],
+    ]);
+    let rotation = 0;
+    const doc = {
+        Viewer: {
+            getViewingRect: () => ({x: 0.1, r: 0.9, y: 0.2, b: 0.8}),
+            getPageRotate: () => rotation,
+        },
+        GetPageWidth: () => 200,
+        GetPageHeight: () => 300,
+    };
+    const computeFieldAddingPos = extractFunction(
+        documentSource,
+        'CPDFDoc.prototype.private_computeFieldAddingPos = function(nPage, nExtX, nExtY)',
+        {Asc: {editor: {getPDFDoc: () => doc}}}
+    );
+
+    for (const [pageRotation, expected] of rotations) {
+        rotation = pageRotation;
+        const actual = computeFieldAddingPos.call(doc, 0, 20, 10);
+        assert.ok(Math.abs(actual.x - expected.x) < 1e-9, `${pageRotation} degree page x`);
+        assert.ok(Math.abs(actual.y - expected.y) < 1e-9, `${pageRotation} degree page y`);
+    }
+});
+
 test('signature values synchronize across widgets and preserve filled state', () => {
     const {field, history} = createSignatureField();
     const sibling = createSignatureField().field;
