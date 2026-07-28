@@ -472,7 +472,7 @@
 		this.DocumentRenderer.SearchResults.IsSearch = isEnabled;
 		this.WordControl.OnUpdateOverlay();
 	};
-	PDFEditorApi.prototype.asc_findText = function(props, isNext) {
+	PDFEditorApi.prototype.asc_findText = function(props, isNext, callback) {
 		let oViewer 		= this.getDocumentRenderer();
 		let oDoc			= this.getPDFDoc();
 		let oSearchEngine	= oDoc.SearchEngine;
@@ -484,8 +484,13 @@
 
 		oDoc.RecalculateAll();
 		
-		let isAsync	= (true === oViewer.findText(props, isNext));
+		let isAsync	= (true === oViewer.findText(props, isNext, (currentMatch, count) => {
+			if (callback)
+				callback(count);
+		}));
 		let result	= oSearchEngine.Count;
+		if (!isAsync && callback)
+			callback(result);
 		
 		return result;
 	};

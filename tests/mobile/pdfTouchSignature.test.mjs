@@ -419,6 +419,29 @@ test('PDF selection API converts real bounds, including a rotated text transform
     ]);
 });
 
+test('PDF search reports completion only after asynchronous full-text extraction', () => {
+    const api = Object.create(loadPdfApiPrototype());
+    const completions = [];
+    let completeSearch;
+    const document = {SearchEngine: {Count: 0}, RecalculateAll() {}};
+
+    api.getPDFDoc = () => document;
+    api.getDocumentRenderer = () => ({
+        findText(props, isNext, callback) {
+            assert.deepEqual(JSON.parse(JSON.stringify(props)), {text: 'secret'});
+            assert.equal(isNext, true);
+            completeSearch = callback;
+            return true;
+        },
+    });
+    assert.equal(api.asc_findText({text: 'secret'}, true, count => completions.push(count)), 0);
+    assert.deepEqual(completions, []);
+
+    document.SearchEngine.Count = 3;
+    completeSearch(1, 3);
+    assert.deepEqual(completions, [3]);
+});
+
 test('PDF form insertion points stay inside the visible page for every rotation', () => {
     const rotations = new Map([
         [0, {x: 90, y: 100}],
