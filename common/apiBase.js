@@ -1426,7 +1426,7 @@
 		// Change state type (to opening)
 		this.advancedOptionsAction = AscCommon.c_oAscAdvancedOptionsAction.Open;
 
-		this._sendDocumentOpenState('converting', {repeat: isRepeat === true});
+		this._sendDocumentOpenState('requestingDocument', {repeat: isRepeat === true});
 
 		//todo auth on connection
 		this.CoAuthoringApi.auth(this.getViewMode(), this._getOpenCmd());
@@ -1990,14 +1990,14 @@
 		{
 			AscCommon.g_oIdCounter.Set_UserId('' + e);
 		};
+		this.CoAuthoringApi.onFirstLoadChangesStart   = function()
+		{
+			t._sendDocumentOpenState('applyingChanges');
+		};
 		this.CoAuthoringApi.onFirstLoadChangesEnd     = function(openedAt)
 		{
 			t._sendDocumentOpenState('applyingChanges', {complete: true});
 			t.asyncServerIdEndLoaded(openedAt);
-		};
-		this.CoAuthoringApi.onServerSaveConfirmed = function(fact)
-		{
-			t.sendEvent('asc_onServerSaveConfirmed', fact);
 		};
 		this.CoAuthoringApi.onServerSaveStateChanged = function(fact)
 		{

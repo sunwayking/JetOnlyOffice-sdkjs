@@ -13,6 +13,25 @@ on:
       - 'hotfix/**'
 
 jobs:
+  source-build-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out JetOnlyOffice SDKJS
+        uses: actions/checkout@v4
+        with:
+          path: sdkjs
+
+      - name: Check out locked sdkjs-forms mirror
+        uses: actions/checkout@v4
+        with:
+          repository: sunwayking/JetOnlyOffice-sdkjs-forms
+          path: sdkjs-forms
+          ref: 1a883281c41fa9aa5e98c64cce13b14782f92f56
+
+      - name: Build SDKJS
+        working-directory: sdkjs
+        run: python build/build.py --mobile --addon ../sdkjs-forms
+
   locked-baseline-tests:
     runs-on: ubuntu-latest
     steps:
