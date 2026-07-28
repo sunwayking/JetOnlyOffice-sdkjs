@@ -101,6 +101,9 @@
       this._CoAuthoringApi.onWarning = function(e) {
         t.callback_OnWarning(e);
       };
+      this._CoAuthoringApi.onFirstLoadChangesStart = function() {
+        t.callback_OnFirstLoadChangesStart();
+      };
       this._CoAuthoringApi.onFirstLoadChangesEnd = function(openedAt) {
         t.callback_OnFirstLoadChangesEnd(openedAt);
       };
@@ -131,9 +134,6 @@
       };
       this._CoAuthoringApi.onUnSaveLock = function() {
         t.callback_OnUnSaveLock();
-      };
-      this._CoAuthoringApi.onServerSaveConfirmed = function(e) {
-        t.callback_OnServerSaveConfirmed(e);
       };
       this._CoAuthoringApi.onServerSaveStateChanged = function(e) {
         t.callback_OnServerSaveStateChanged(e);
@@ -193,7 +193,8 @@
       // Dummy calls
       this.callback_OnSpellCheckInit('');
       this.callback_OnSetIndexUser('123');
-      this.onFirstLoadChangesEnd();
+      this.callback_OnFirstLoadChangesStart();
+      this.callback_OnFirstLoadChangesEnd();
     }
   };
 
@@ -486,6 +487,12 @@
     }
   };
 
+  CDocsCoApi.prototype.callback_OnFirstLoadChangesStart = function() {
+    if (this.onFirstLoadChangesStart) {
+      this.onFirstLoadChangesStart();
+    }
+  };
+
   CDocsCoApi.prototype.callback_OnFirstLoadChangesEnd = function(openedAt) {
     if (this.onFirstLoadChangesEnd) {
       this.onFirstLoadChangesEnd(openedAt);
@@ -539,12 +546,6 @@
   CDocsCoApi.prototype.callback_OnUnSaveLock = function() {
     if (this.onUnSaveLock) {
       this.onUnSaveLock();
-    }
-  };
-
-  CDocsCoApi.prototype.callback_OnServerSaveConfirmed = function(e) {
-    if (this.onServerSaveConfirmed) {
-      this.onServerSaveConfirmed(e);
     }
   };
 
@@ -689,44 +690,40 @@
     this._authChanges = [];
     this._authOtherChanges = [];
     this._transportSequence = 0;
-    this._saveConfirmationSequence = 0;
     this._saveStateSequence = 0;
+  }
+
+  function createSequencedFact(owner, sequenceProperty, valueProperty, value, details) {
+    var fact = {
+      sequence: ++owner[sequenceProperty]
+    };
+    fact[valueProperty] = value;
+    if (details) {
+      for (var key in details) {
+        if (details.hasOwnProperty(key)) {
+          fact[key] = details[key];
+        }
+      }
+    }
+    return fact;
   }
 
   DocsCoApi.prototype._emitTransportState = function(state, details) {
     if (!this.onTransportStateChanged) {
       return;
     }
-    var fact = {
-      state: state,
-      sequence: ++this._transportSequence
-    };
-    if (details) {
-      for (var key in details) {
-        if (details.hasOwnProperty(key)) {
-          fact[key] = details[key];
-        }
-      }
-    }
-    this.onTransportStateChanged(fact);
+    this.onTransportStateChanged(createSequencedFact(
+      this, '_transportSequence', 'state', state, details
+    ));
   };
 
   DocsCoApi.prototype._emitServerSaveState = function(state, details) {
     if (!this.onServerSaveStateChanged) {
       return;
     }
-    var fact = {
-      state: state,
-      sequence: ++this._saveStateSequence
-    };
-    if (details) {
-      for (var key in details) {
-        if (details.hasOwnProperty(key)) {
-          fact[key] = details[key];
-        }
-      }
-    }
-    this.onServerSaveStateChanged(fact);
+    this.onServerSaveStateChanged(createSequencedFact(
+      this, '_saveStateSequence', 'state', state, details
+    ));
   };
 
   DocsCoApi.prototype.isRightURL = function() {
@@ -949,7 +946,7 @@
     // Set save state
     this._state = ConnectionState.SaveChanges;
     if (reSave) {
-      this._emitServerSaveState('retrying', {reason: reSave});
+      this._emitServerSaveState('retrying', {attempt: reSave});
     } else if (isInitialSaveBatch) {
       this._emitServerSaveState('saving');
     }
@@ -1370,21 +1367,13 @@
       this.syncChangesIndex = data['syncChangesIndex'];
     }
 
-    var confirmation = {
-        changesIndex: this.changesIndex,
-        syncChangesIndex: this.syncChangesIndex,
-        time: this.lastOwnSaveTime,
-        sequence: ++this._saveConfirmationSequence
-    };
-    this._emitServerSaveState('confirmed', {
-      changesIndex: confirmation.changesIndex,
-      syncChangesIndex: confirmation.syncChangesIndex,
-      time: confirmation.time,
-      confirmationSequence: confirmation.sequence
+    // This acknowledges the coauthoring change index; host callback persistence is separate.
+    this._emitServerSaveState('accepted', {
+      scope: 'coauthoring-server',
+      changesIndex: this.changesIndex,
+      syncChangesIndex: this.syncChangesIndex,
+      time: this.lastOwnSaveTime
     });
-    if (this.onServerSaveConfirmed) {
-      this.onServerSaveConfirmed(confirmation);
-    }
 	
     if (this.onUnSaveLock) {
       this.onUnSaveLock();
@@ -1687,6 +1676,9 @@
           for (var j = 0; j < changeOneUser.length; ++j)
             this.onSaveChanges(changeOneUser[j], null, true);
         }
+      }
+      if (this.onFirstLoadChangesStart) {
+        this.onFirstLoadChangesStart();
       }
       this._updateAuthChanges();
       // Always send this - opening relies on it

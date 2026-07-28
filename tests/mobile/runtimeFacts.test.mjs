@@ -61,13 +61,10 @@ test('transport facts are sequenced separately from collaborator presence', () =
     ]);
 });
 
-test('unSaveLock publishes server-confirmed indexes after applying metadata', () => {
+test('unSaveLock publishes one coauthoring-server acceptance fact after applying metadata', () => {
     const api = createDocsCoApi();
-    const confirmations = [];
     const states = [];
-    api.onServerSaveConfirmed = fact => confirmations.push({...fact});
     api.onServerSaveStateChanged = fact => states.push({...fact});
-    api._CoAuthoringApi.onServerSaveConfirmed = fact => api.callback_OnServerSaveConfirmed(fact);
     api._CoAuthoringApi.onServerSaveStateChanged = fact => api.callback_OnServerSaveStateChanged(fact);
     api._CoAuthoringApi._sendBufferedLocks = () => {};
     api._CoAuthoringApi._send = () => {};
@@ -77,23 +74,48 @@ test('unSaveLock publishes server-confirmed indexes after applying metadata', ()
 
     api._CoAuthoringApi._onUnSaveLock({index: 7, syncChangesIndex: 9, time: 42});
 
-    assert.deepEqual(confirmations, [{
-        changesIndex: 7,
-        syncChangesIndex: 9,
-        time: 42,
-        sequence: 1
-    }]);
     assert.deepEqual(states, [
         {state: 'saving', sequence: 1},
-        {state: 'retrying', sequence: 2, reason: 1},
+        {state: 'retrying', sequence: 2, attempt: 1},
         {
-            state: 'confirmed',
+            state: 'accepted',
             sequence: 3,
+            scope: 'coauthoring-server',
             changesIndex: 7,
             syncChangesIndex: 9,
-            time: 42,
-            confirmationSequence: 1
+            time: 42
         }
+    ]);
+});
+
+test('initial collaboration phases bracket application of server changes', () => {
+    const api = createDocsCoApi();
+    const events = [];
+    const coApi = api._CoAuthoringApi;
+    api.onFirstLoadChangesStart = () => events.push('apply-start');
+    api.onFirstLoadChangesEnd = () => events.push('apply-end');
+    coApi.onFirstLoadChangesStart = () => api.callback_OnFirstLoadChangesStart();
+    coApi.onFirstLoadChangesEnd = () => api.callback_OnFirstLoadChangesEnd();
+    coApi._isAuth = false;
+    coApi._user = {asc_getId: () => 'user-'};
+    coApi._onRefreshToken = () => {};
+    coApi._onServerVersion = () => {};
+    coApi._onLicenseChanged = () => {};
+    coApi._onAuthParticipantsChanged = () => {};
+    coApi._onSpellCheckInit = () => {};
+    coApi._onSetIndexUser = () => {};
+    coApi._onMessages = () => {};
+    coApi._onGetLock = () => {};
+    coApi._updateAuthChanges = () => events.push('server-changes-applied');
+    coApi._applyPrebuffered = () => {};
+    coApi._sendPrebuffered = () => {};
+
+    coApi._onAuth({jwt: 'token', result: 1, indexUser: 2, participants: []});
+
+    assert.deepEqual(events, [
+        'apply-start',
+        'server-changes-applied',
+        'apply-end'
     ]);
 });
 
@@ -167,16 +189,17 @@ test('base editor exposes stable open, transport, and save callback names', () =
     for (const callbackName of [
         'asc_onDocumentOpenStateChanged',
         'asc_onTransportStateChanged',
-        'asc_onServerSaveStateChanged',
-        'asc_onServerSaveConfirmed'
+        'asc_onServerSaveStateChanged'
     ]) {
         assert.match(apiBaseSource, new RegExp(callbackName));
     }
+    assert.doesNotMatch(apiBaseSource, /asc_onServerSaveConfirmed/);
+    assert.doesNotMatch(docsCoApiSource, /onServerSaveConfirmed/);
 
     for (const phase of [
         'connecting',
         'authenticating',
-        'converting',
+        'requestingDocument',
         'downloading',
         'parsing',
         'applyingChanges',
