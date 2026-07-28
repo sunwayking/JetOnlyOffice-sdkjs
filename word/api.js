@@ -7877,6 +7877,10 @@ background-repeat: no-repeat;\
 			_progress.Type        = c_oAscAsyncAction.LoadDocumentFonts;
 			_progress.FontsCount  = this.FontLoader.fonts_loading.length;
 			_progress.CurrentFont = 0;
+			this._sendDocumentOpenState('loadingResources', {
+				resource: 'fonts',
+				total: _progress.FontsCount
+			});
 
 			var _loader_object = this.WordControl.m_oLogicDocument;
 			var _count         = 0;

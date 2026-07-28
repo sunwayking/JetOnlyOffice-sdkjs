@@ -46,6 +46,7 @@ jobs:
           npm install grunt-cli node-qunit-puppeteer
           npm install --prefix build
           node node_modules/grunt-cli/bin/grunt --gruntfile build/Gruntfile.js develop
+          node --test tests/mobile/*.test.mjs
           node node_modules/node-qunit-puppeteer/cli.js tests/common/api/api.html 30000 "--no-sandbox"
           node node_modules/node-qunit-puppeteer/cli.js tests/cell/shortcuts/shortcuts.html 30000 "--no-sandbox"
           node node_modules/node-qunit-puppeteer/cli.js tests/cell/spreadsheet-calculation/formula-tests/FormulaTests.html 30000 "--no-sandbox"

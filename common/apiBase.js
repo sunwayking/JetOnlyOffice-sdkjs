@@ -102,6 +102,7 @@
 		// Variable indicates whether we received a response from the collaborative editing server
 		this.ServerIdWaitComplete = false;
 		this.ServerIdWaitAction = null;
+		this.documentOpenStateSequence = 0;
 
 		// Long action
 		this.IsLongActionCurrent       = 0;
@@ -1403,11 +1404,29 @@
 			graphicController.checkSingleChartSelection();
 		}
 	};
+	baseEditorsApi.prototype._sendDocumentOpenState = function (phase, details)
+	{
+		var fact = {
+			phase: phase,
+			sequence: ++this.documentOpenStateSequence
+		};
+		if (details)
+		{
+			for (var key in details)
+			{
+				if (details.hasOwnProperty(key))
+					fact[key] = details[key];
+			}
+		}
+		this.sendEvent('asc_onDocumentOpenStateChanged', fact);
+	};
 	// Open
 	baseEditorsApi.prototype.asc_LoadDocument                    = function(isRepeat)
 	{
 		// Change state type (to opening)
 		this.advancedOptionsAction = AscCommon.c_oAscAdvancedOptionsAction.Open;
+
+		this._sendDocumentOpenState('converting', {repeat: isRepeat === true});
 
 		//todo auth on connection
 		this.CoAuthoringApi.auth(this.getViewMode(), this._getOpenCmd());
@@ -1443,6 +1462,7 @@
 	baseEditorsApi.prototype._onOpenCommand                      = function(data)
 	{
 		var t = this;
+		this._sendDocumentOpenState('downloading');
 		let perfStart = performance.now();
 		AscCommon.openFileCommand(this.documentId, data, this.documentUrlChanges, this.documentTokenChanges, AscCommon.c_oSerFormat.Signature, function(error, result)
 		{
@@ -1450,9 +1470,11 @@
 			AscCommon.sendClientLog("debug", AscCommon.getClientInfoString("onDownloadFile", perfEnd - perfStart), t);
 			if (c_oAscError.ID.No !== error)
 			{
+				t._sendDocumentOpenState('failed', {error: error});
 				t.sendEvent("asc_onError", error, c_oAscError.Level.Critical);
 				return;
 			}
+			t._sendDocumentOpenState('parsing');
 			t.onEndLoadFile(result);
 		});
 	};
@@ -1513,6 +1535,7 @@
 			setInterval(function() {t._autoSave();}, 40);
 		}
 		this.sync_EndAction(c_oAscAsyncActionType.BlockInteraction, c_oAscAsyncAction.Open);
+		this._sendDocumentOpenState('ready');
 		this.sendEvent('asc_onDocumentContentReady');
 
 		let time = this.VersionHistory ? undefined : performance.now();//todo perfStart?
@@ -1812,6 +1835,7 @@
 	baseEditorsApi.prototype.asc_getEditorPermissions            = function()
 	{
 		AscCommon.sendClientLog("debug", AscCommon.getClientInfoString("getEditorPermissions", performance.now()), this);
+		this._sendDocumentOpenState('connecting');
 		this._coAuthoringInit();
 	};
 	baseEditorsApi.prototype.getConvertedXLSXFileFromUrl  = function (oDocument, nOutputFormat, fCallback) {
@@ -1943,6 +1967,12 @@
 
 			t.sendEvent('asc_onServerVersion', buildVersion, buildNumber);
 		};
+		this.CoAuthoringApi.onTransportStateChanged = function(fact)
+		{
+			t.sendEvent('asc_onTransportStateChanged', fact);
+			if (!t.isDocumentLoadComplete && fact.state === 'authenticating')
+				t._sendDocumentOpenState('authenticating', {transportSequence: fact.sequence});
+		};
 		this.CoAuthoringApi.onAuthParticipantsChanged = function(users, userId)
 		{
 			t.sendEvent("asc_onAuthParticipantsChanged", users, userId);
@@ -1962,7 +1992,16 @@
 		};
 		this.CoAuthoringApi.onFirstLoadChangesEnd     = function(openedAt)
 		{
+			t._sendDocumentOpenState('applyingChanges', {complete: true});
 			t.asyncServerIdEndLoaded(openedAt);
+		};
+		this.CoAuthoringApi.onServerSaveConfirmed = function(fact)
+		{
+			t.sendEvent('asc_onServerSaveConfirmed', fact);
+		};
+		this.CoAuthoringApi.onServerSaveStateChanged = function(fact)
+		{
+			t.sendEvent('asc_onServerSaveStateChanged', fact);
 		};
 		this.CoAuthoringApi.onFirstConnect            = function()
 		{
@@ -2173,6 +2212,8 @@
 				} else {
 					var error = AscCommon.getDisconnectErrorCode(t.isDocumentLoadComplete, opt_closeCode);
 					var level = t.isDocumentLoadComplete ? Asc.c_oAscError.Level.NoCritical : Asc.c_oAscError.Level.Critical;
+					if (!t.isDocumentLoadComplete)
+						t._sendDocumentOpenState('failed', {error: error, closeCode: opt_closeCode});
 					t.setViewModeDisconnect(AscCommon.getEnableDownloadByCloseCode(opt_closeCode));
 					if (Asc.c_oAscError.ID.UpdateVersion === error && !t.isDocumentModified()) {
 						t.sendEvent("asc_onDocumentUpdateVersion", function() {});
