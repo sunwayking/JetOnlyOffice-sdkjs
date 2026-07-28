@@ -3559,7 +3559,86 @@
 		return arrPreviews;
 	};
 	PDFEditorApi.prototype.asc_GetSelectionBounds = function() {
-		return [[0,0], [0,0], [0,0], [0,0]];
+		let oDoc = this.getPDFDoc();
+		let oDrawingDocument = this.getDrawingDocument();
+		if (!oDoc || !oDrawingDocument)
+			return [[0,0], [0,0], [0,0], [0,0]];
+
+		let oBounds = oDoc.GetSelectionBounds();
+		if (!oBounds || !oBounds.Start || !oBounds.End)
+			return [[0,0], [0,0], [0,0], [0,0]];
+
+		let x0 = oBounds.Start.X;
+		let y0 = oBounds.Start.Y;
+		let x1 = oBounds.Start.X;
+		let y1 = oBounds.Start.Y + oBounds.Start.H;
+		let x2 = oBounds.End.X + oBounds.End.W;
+		let y2 = oBounds.End.Y;
+		let x3 = oBounds.End.X + oBounds.End.W;
+		let y3 = oBounds.End.Y + oBounds.End.H;
+
+		let oTextController = oDoc.getTextController();
+		let oContent = oTextController && oTextController.GetDocContent ? oTextController.GetDocContent() : null;
+		let oMatrix = oContent && oContent.Get_ParentTextTransform ? oContent.Get_ParentTextTransform() : null;
+		if (oMatrix) {
+			let aPoints = [[x0, y0], [x1, y1], [x2, y2], [x3, y3]];
+			for (let nIndex = 0; nIndex < aPoints.length; nIndex++) {
+				let x = aPoints[nIndex][0];
+				let y = aPoints[nIndex][1];
+				aPoints[nIndex][0] = oMatrix.TransformPointX(x, y);
+				aPoints[nIndex][1] = oMatrix.TransformPointY(x, y);
+			}
+			x0 = aPoints[0][0]; y0 = aPoints[0][1];
+			x1 = aPoints[1][0]; y1 = aPoints[1][1];
+			x2 = aPoints[2][0]; y2 = aPoints[2][1];
+			x3 = aPoints[3][0]; y3 = aPoints[3][1];
+		}
+
+		let oPos0 = oDrawingDocument.ConvertCoordsToCursorWR(x0, y0, oBounds.Start.Page, undefined, false);
+		let oPos1 = oDrawingDocument.ConvertCoordsToCursorWR(x1, y1, oBounds.Start.Page, undefined, false);
+		let oPos2 = oDrawingDocument.ConvertCoordsToCursorWR(x2, y2, oBounds.End.Page, undefined, false);
+		let oPos3 = oDrawingDocument.ConvertCoordsToCursorWR(x3, y3, oBounds.End.Page, undefined, false);
+
+		return [[oPos0.X, oPos0.Y], [oPos1.X, oPos1.Y], [oPos2.X, oPos2.Y], [oPos3.X, oPos3.Y]];
+	};
+	PDFEditorApi.prototype.asc_getAllSignatures = function() {
+		let oDoc = this.getPDFDoc();
+		return oDoc ? oDoc.GetAllSignatures() : [];
+	};
+	PDFEditorApi.prototype.asc_getRequestSignatures = function() {
+		let aSignatures = this.asc_getAllSignatures();
+		let aRequested = [];
+		let aDocumentSignatures = this.signatures || [];
+
+		for (let nIndex = aSignatures.length - 1; nIndex >= 0; nIndex--) {
+			let oSignature = aSignatures[nIndex];
+			if (!oSignature || (oSignature.isForm && oSignature.filled)) {
+				continue;
+			}
+
+			let bFound = false;
+			for (let nSignatureIndex = aDocumentSignatures.length - 1; nSignatureIndex >= 0; nSignatureIndex--) {
+				let oDocumentSignature = aDocumentSignatures[nSignatureIndex];
+				if (oDocumentSignature && oDocumentSignature.isEqualGuid && oDocumentSignature.isEqualGuid(oSignature.id)) {
+					bFound = true;
+					break;
+				}
+			}
+
+			if (!bFound) {
+				let oRequested = new AscCommon.asc_CSignatureLine();
+				oRequested.guid = oSignature.id;
+				oRequested.signer1 = oSignature.signer || "";
+				oRequested.signer2 = oSignature.signer2 || "";
+				oRequested.email = oSignature.email || "";
+				oRequested.showDate = !!oSignature.showDate;
+				oRequested.instructions = oSignature.instructions || "";
+				oRequested.isForm = !!oSignature.isForm;
+				aRequested.push(oRequested);
+			}
+		}
+
+		return aRequested;
 	};
 
 	PDFEditorApi.prototype.getPluginContextMenuInfo = function () {
@@ -5534,6 +5613,8 @@
 	PDFEditorApi.prototype['remTable']						= PDFEditorApi.prototype.remTable;
 	PDFEditorApi.prototype['asc_getTableStylesPreviews']	= PDFEditorApi.prototype.asc_getTableStylesPreviews;
 	PDFEditorApi.prototype['asc_GetSelectionBounds']		= PDFEditorApi.prototype.asc_GetSelectionBounds;
+	PDFEditorApi.prototype['asc_getAllSignatures']		= PDFEditorApi.prototype.asc_getAllSignatures;
+	PDFEditorApi.prototype['asc_getRequestSignatures']	= PDFEditorApi.prototype.asc_getRequestSignatures;
 	PDFEditorApi.prototype['asc_setPdfViewer']		        = PDFEditorApi.prototype.asc_setPdfViewer;
 
 	PDFEditorApi.prototype['asc_GetTableOfContentsPr']      = PDFEditorApi.prototype.asc_GetTableOfContentsPr;
