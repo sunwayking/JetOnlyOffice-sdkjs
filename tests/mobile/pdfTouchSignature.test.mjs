@@ -12,6 +12,7 @@ const apiSource = readFileSync(new URL('../../pdf/api.js', import.meta.url), 'ut
 const documentSource = readFileSync(new URL('../../pdf/src/document.js', import.meta.url), 'utf8');
 const fileSource = readFileSync(new URL('../../pdf/src/file.js', import.meta.url), 'utf8');
 const signatureSource = readFileSync(new URL('../../pdf/src/forms/signature.js', import.meta.url), 'utf8');
+const textSelectTrackSource = readFileSync(new URL('../../pdf/src/textSelectTrackHandler.js', import.meta.url), 'utf8');
 const baseFieldSource = readFileSync(new URL('../../pdf/src/forms/base/base.js', import.meta.url), 'utf8');
 const metafileSource = readFileSync(new URL('../../common/Drawings/Metafile.js', import.meta.url), 'utf8');
 
@@ -338,6 +339,26 @@ test('PDF page text selection exposes transformed multi-page bounds through the 
     });
 });
 
+test('PDF text selection track reuses CFile bounds for Desktop and Mobile geometry', () => {
+    const selectionBounds = {
+        Start: {X: 10, Y: 20, W: 5, H: 6, Page: 0},
+        End: {X: 40, Y: 50, W: 7, H: 8, Page: 1},
+    };
+    const window = {
+        AscPDF: {},
+        Asc: {
+            editor: {
+                getDocumentRenderer: () => ({file: {getSelectionBounds: () => selectionBounds}}),
+            },
+        },
+    };
+    window.window = window;
+    vm.runInNewContext(textSelectTrackSource, {window, console, ...window});
+
+    const handler = new window.AscPDF.CTextSelectTrackHandler({}, {});
+    assert.deepEqual(JSON.parse(JSON.stringify(handler.GetBounds())), [10, 20, 47, 58]);
+});
+
 test('PDF form hit testing uses supplied touch coordinates instead of global mouse state', () => {
     const document = Object.create(loadPdfDocumentPrototype());
     const calls = [];
@@ -477,11 +498,19 @@ test('PDF document and API create a real signature field through exported protot
         GetCurPage: () => 4,
     };
     api.getPDFDoc = () => apiDocument;
+    api.asc_getSignatureFields = () => [{id: 'Signature1'}];
+    api.asc_getSignatures = () => [];
+    api.asc_getRequestSignatures = () => [{guid: 'Signature1'}];
+    api.sendEvent = (...args) => addCalls.push(['event', ...args]);
 
     assert.equal(api.AddSignatureField({signer: 'Alice'}), true);
-    assert.deepEqual(addCalls, [
-        ['create', {signer: 'Alice'}],
-        ['add', createdField, 4, true],
+    assert.deepEqual(addCalls[0], ['create', {signer: 'Alice'}]);
+    assert.equal(addCalls[1][0], 'add');
+    assert.equal(addCalls[1][1], createdField);
+    assert.deepEqual(addCalls[1].slice(2), [4, true]);
+    assert.deepEqual(JSON.parse(JSON.stringify(addCalls.slice(2))), [
+        ['event', 'asc_onUpdateSignatureFields', [{id: 'Signature1'}]],
+        ['event', 'asc_onUpdateSignatures', [], [{guid: 'Signature1'}]],
     ]);
 });
 
@@ -497,9 +526,11 @@ test('PDF clear-all API resets every form in one real document action', () => {
         ResetForms(names, allExcept) {
             calls.push(['reset', names, allExcept]);
         },
-        GetAllSignatures: () => [],
+        GetSignatureFields: () => [],
     };
     api.getPDFDoc = () => document;
+    api.asc_getSignatures = () => [];
+    api.asc_getRequestSignatures = () => [{guid: 'approval'}];
     api.sendEvent = (...args) => calls.push(['event', ...args]);
 
     assert.equal(api.asc_ClearAllSpecialForms(), true);
@@ -507,6 +538,12 @@ test('PDF clear-all API resets every form in one real document action', () => {
     assert.equal(calls[0][2], api);
     assert.deepEqual(JSON.parse(JSON.stringify(calls[1])), ['reset', [], false]);
     assert.deepEqual(calls[2], ['event', 'asc_onUpdateSignatureFields', []]);
+    assert.deepEqual(JSON.parse(JSON.stringify(calls[3])), [
+        'event',
+        'asc_onUpdateSignatures',
+        [],
+        [{guid: 'approval'}],
+    ]);
 });
 
 test('signature values synchronize across widgets and preserve filled state', () => {
@@ -573,6 +610,9 @@ test('signature snapshots expose existing filled fields without duplicates', () 
     };
     const other = {GetType: () => 27};
     Object.defineProperty(document, 'widgets', {value: [first, duplicate, other]});
+    assert.deepEqual(JSON.parse(JSON.stringify(document.GetSignatureFields())), [
+        {id: 'approval', filled: true}
+    ]);
     assert.deepEqual(JSON.parse(JSON.stringify(document.GetAllSignatures())), [
         {id: 'approval', filled: true}
     ]);
@@ -613,6 +653,9 @@ test('PDF signature appearance API fails closed without a core persistence capab
 
     assert.equal(api.asc_SetSignatureFieldAppearance({fieldId: 'approval', mode: 'typed', text: 'Alice'}), false);
     assert.equal(fieldLookupCount, 0);
+
+    const {field} = createSignatureField();
+    assert.equal(field.asc_SetAppearance, undefined);
 });
 
 test('PDF signature appearance API separates form-field and certificate signature updates', () => {
@@ -635,7 +678,7 @@ test('PDF signature appearance API separates form-field and certificate signatur
             assert.equal(owner, api);
             return action();
         },
-        GetAllSignatures: () => [{id: 'approval', filled: true}],
+        GetSignatureFields: () => [{id: 'approval', filled: true}],
     };
     const certificateSignatures = [{id: 'certificate-signature'}];
     api.getPDFDoc = () => document;
@@ -678,6 +721,10 @@ test('signature appearance is validated, synchronized, and exposed in signature 
     assert.equal(field.IsFilled(), true);
     assert.equal(sibling.IsFilled(), true);
     assert.deepEqual(JSON.parse(JSON.stringify(field.GetSignatureInfo().appearance)), expected);
+
+    const mutableSnapshot = field.GetAppearance();
+    mutableSnapshot.text = 'Mallory';
+    assert.equal(field.GetAppearance().text, 'Alice Example');
 
     assert.equal(field.SetAppearance({mode: 'image', image: 'https://example.test/signature.png'}), false);
     assert.deepEqual(JSON.parse(JSON.stringify(field.GetAppearance())), expected);

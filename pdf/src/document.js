@@ -9183,7 +9183,7 @@ var CPresentation = CPresentation || function(){};
 		
 		return false;
 	};
-    CPDFDoc.prototype.GetAllSignatures = function() {
+    CPDFDoc.prototype.GetSignatureFields = function() {
         let aSignatures = [];
         let oSeen = Object.create(null);
 
@@ -9203,6 +9203,9 @@ var CPresentation = CPresentation || function(){};
         }
 
         return aSignatures;
+    };
+    CPDFDoc.prototype.GetAllSignatures = function() {
+        return this.GetSignatureFields();
     };
     CPDFDoc.prototype.IsSignatureAppearancePersistenceSupported = function() {
         let oNativeFile = this.Viewer && this.Viewer.file && this.Viewer.file.nativeFile;

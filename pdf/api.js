@@ -1674,11 +1674,16 @@
 			return false;
 		}
 
-		return oDoc.DoAction(function() {
+		let bAdded = oDoc.DoAction(function() {
 			let oField = oDoc.CreateSignatureField(oParams);
 			oDoc.AddField(oField, oDoc.GetCurPage(), true);
 			return true;
 		}, AscDFH.historydescription_Pdf_AddField, this);
+		if (bAdded) {
+			this.sendEvent("asc_onUpdateSignatureFields", this.asc_getSignatureFields());
+			this.sendEvent("asc_onUpdateSignatures", this.asc_getSignatures(), this.asc_getRequestSignatures());
+		}
+		return bAdded;
 	};
 	PDFEditorApi.prototype.asc_ClearAllSpecialForms = function() {
 		let oDoc = this.getPDFDoc();
@@ -1692,6 +1697,7 @@
 		}, AscDFH.historydescription_Document_ClearAllSpecialForms, this);
 		if (bReset) {
 			this.sendEvent("asc_onUpdateSignatureFields", this.asc_getSignatureFields());
+			this.sendEvent("asc_onUpdateSignatures", this.asc_getSignatures(), this.asc_getRequestSignatures());
 		}
 		return bReset;
 	};
@@ -3630,7 +3636,7 @@
 	};
 	PDFEditorApi.prototype.asc_getSignatureFields = function() {
 		let oDoc = this.getPDFDoc();
-		return oDoc ? oDoc.GetAllSignatures() : [];
+		return oDoc ? oDoc.GetSignatureFields() : [];
 	};
 	PDFEditorApi.prototype.asc_getAllSignatures = function() {
 		return this.asc_getSignatureFields();

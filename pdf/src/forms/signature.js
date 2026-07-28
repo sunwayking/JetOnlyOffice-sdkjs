@@ -123,7 +123,8 @@
 	};
 	CSignatureField.prototype.GetAppearance = function() {
 		let oMeta = this.GetMeta() || {};
-		return oMeta["signatureAppearance"] || null;
+		let oAppearance = oMeta["signatureAppearance"];
+		return oAppearance ? Object.assign({}, oAppearance) : null;
 	};
 	CSignatureField.prototype.SetAppearance = function(value) {
 		let oAppearance = normalizeSignatureAppearance(value);
@@ -413,6 +414,5 @@
 	window["AscPDF"].CSignatureField.prototype["asc_GetValue"] = CSignatureField.prototype.GetValue;
 	window["AscPDF"].CSignatureField.prototype["asc_IsFilled"] = CSignatureField.prototype.IsFilled;
 	window["AscPDF"].CSignatureField.prototype["asc_GetAppearance"] = CSignatureField.prototype.GetAppearance;
-	window["AscPDF"].CSignatureField.prototype["asc_SetAppearance"] = CSignatureField.prototype.SetAppearance;
 })();
 
