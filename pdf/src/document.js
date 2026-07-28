@@ -9158,7 +9158,25 @@ var CPresentation = CPresentation || function(){};
 		return false;
 	};
     CPDFDoc.prototype.GetAllSignatures = function() {
-        return [];
+        let aSignatures = [];
+        let oSeen = Object.create(null);
+
+        for (let nIndex = 0; nIndex < this.widgets.length; nIndex++) {
+            let oField = this.widgets[nIndex];
+            if (!oField || oField.GetType() != AscPDF.FIELD_TYPES.signature) {
+                continue;
+            }
+
+            let sName = oField.GetFullName() || oField.GetId();
+            if (oSeen[sName]) {
+                continue;
+            }
+
+            oSeen[sName] = true;
+            aSignatures.push(oField.GetSignatureInfo());
+        }
+
+        return aSignatures;
     };
     CPDFDoc.prototype.GetCursorRealPosition = function() {
         return {
@@ -9194,16 +9212,43 @@ var CPresentation = CPresentation || function(){};
     // for touch
     CPDFDoc.prototype.GetSelectionBounds = function()
     {
-        return null;
+        let oTextController = this.getTextController();
+        let oContent = oTextController && oTextController.GetDocContent ? oTextController.GetDocContent() : null;
+        let oBounds = oContent && oContent.GetSelectionBounds ? oContent.GetSelectionBounds() : null;
+        if (!oBounds || !oBounds.Start || !oBounds.End) {
+            return null;
+        }
+
+        let nPage = oTextController && oTextController.GetPage ? oTextController.GetPage() : this.GetCurPage();
+        let oResult = {
+            Start: Object.assign({}, oBounds.Start),
+            End: Object.assign({}, oBounds.End)
+        };
+        if (oResult.Start.Page == null) {
+            oResult.Start.Page = nPage;
+        }
+        if (oResult.End.Page == null) {
+            oResult.End.Page = nPage;
+        }
+        if (oBounds.Direction != null) {
+            oResult.Direction = oBounds.Direction;
+        }
+        if (oBounds.Type != null) {
+            oResult.Type = oBounds.Type;
+        }
+
+        return oResult;
     };
     CPDFDoc.prototype.IsInForm = function(x, y, pageIndex)
     {
-        // TODO:
-        return (null != this.Viewer.getPageFieldByMouse(false)) ? true : false;
+        if (!this.GetPageInfo(pageIndex)) {
+            return false;
+        }
+        return null != this.Viewer.getPageFieldByCoords(x / g_dKoef_pt_to_mm, y / g_dKoef_pt_to_mm, pageIndex, false);
     };
     CPDFDoc.prototype.IsFormFieldEditing = function()
     {
-        return false;
+        return !!(this.activeForm && this.activeForm.IsInForm());
     };
     CPDFDoc.prototype.IsNumberingSelection = function()
     {
@@ -9211,7 +9256,20 @@ var CPresentation = CPresentation || function(){};
     };
     CPDFDoc.prototype.Get_TargetPos = function()
     {
-        return null;
+        if (!this.getTextController()) {
+            return null;
+        }
+
+        let oDrawingDocument = this.GetDrawingDocument();
+        if (!oDrawingDocument || !AscFormat.isRealNumber(oDrawingDocument.m_lTargetPage) || oDrawingDocument.m_lTargetPage < 0) {
+            return null;
+        }
+
+        return {
+            X: oDrawingDocument.m_dTargetX,
+            Y: oDrawingDocument.m_dTargetY,
+            PageNum: oDrawingDocument.m_lTargetPage
+        };
     };
 
     function CActionQueue(oDoc) {

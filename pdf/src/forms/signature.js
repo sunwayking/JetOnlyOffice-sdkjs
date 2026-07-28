@@ -36,6 +36,18 @@
 "use strict";
 
 (function(){
+	const SIGNED_VALUE = "Signed";
+
+	function isFilledValue(value) {
+		if (value && typeof value === "object" && value.filled != null) {
+			return !!value.filled;
+		}
+		if (typeof value === "string") {
+			let normalized = value.toLowerCase();
+			return normalized !== "" && normalized !== "0" && normalized !== "false" && normalized !== "off" && normalized !== "unsigned";
+		}
+		return value === true || value === 1;
+	}
 
     /**
 	 * Class representing a signature field.
@@ -51,20 +63,53 @@
     CSignatureField.prototype.constructor = CSignatureField;
     AscFormat.InitClass(CSignatureField, AscPDF.CBaseField, AscDFH.historyitem_type_Pdf_Signature_Field);
     
-    CSignatureField.prototype.SetValue = function() {
-        return;
+	CSignatureField.prototype.SetValue = function(value) {
+		let sValue = isFilledValue(value) ? SIGNED_VALUE : "";
+		if (sValue === this.GetValue()) {
+			return true;
+		}
+
+		AscCommon.History.Add(new CChangesPDFFormValue(this, this.GetValue(), sValue));
+		this.private_SetValue(sValue);
+		this.SetWasChanged(true);
+		this.SetNeedCommit(true);
+		this.AddToRedraw();
+		return true;
     };
-    CSignatureField.prototype.private_SetValue = CSignatureField.prototype.SetValue
+    CSignatureField.prototype.private_SetValue = function(value) {
+		this.SetFilled(isFilledValue(value));
+	};
+	CSignatureField.prototype.GetValue = function() {
+		return this.IsFilled() ? SIGNED_VALUE : "";
+	};
     CSignatureField.prototype.Draw = function(oGraphicsPDF, oGraphicsWord) {
-        return;
+		if (this.IsHidden() && !Asc.editor.IsEditFieldsMode()) {
+			return;
+		}
+
+		if (this.IsNeedDrawFromStream()) {
+			this.DrawFromStream(oGraphicsPDF, oGraphicsWord);
+			return;
+		}
+
+		this.DrawBackground(oGraphicsPDF);
+		this.DrawBorders(oGraphicsPDF);
+		this.DrawLocks(oGraphicsPDF);
+		this.DrawEdit(oGraphicsWord);
     };
     CSignatureField.prototype.DrawPressed = function() {
-        return;
+		if (this.IsReadOnly()) {
+			return;
+		}
+		this.SetPressed(true);
+		this.AddToRedraw();
     };
     CSignatureField.prototype.DrawUnpressed = function() {
-        return;
+		this.SetPressed(false);
+		this.AddToRedraw();
     };
     CSignatureField.prototype.Recalculate = function() {
+		this.SetNeedRecalc(false);
     };
 
     CSignatureField.prototype.SetPressed = function(bValue) {
@@ -81,13 +126,50 @@
     };
 
     CSignatureField.prototype.onMouseDown = function(x, y, e) {
+		let oDoc = this.GetDocument();
+		let bInFocus = oDoc.activeForm === this;
+		oDoc.activeForm = this;
+
+		if (oDoc.IsEditFieldsMode()) {
+			let oEditShape = this.GetEditShape();
+			oEditShape && oEditShape.onMouseDown(x, y, e);
+			return;
+		}
+
+		let oDrawingDocument = oDoc.GetDrawingDocument();
+		oDrawingDocument && oDrawingDocument.TargetEnd();
+		this.SetInForm(true);
+		this.DrawPressed();
+		if (bInFocus)
+			this.AddActionsToQueue(AscPDF.PDF_TRIGGERS_TYPES.MouseDown);
+		else
+			this.AddActionsToQueue(AscPDF.PDF_TRIGGERS_TYPES.MouseDown, AscPDF.PDF_TRIGGERS_TYPES.OnFocus);
     };
     CSignatureField.prototype.onMouseUp = function() {
+		if (this.IsReadOnly()) {
+			return;
+		}
+
+		let oDoc = this.GetDocument();
+		this.DrawUnpressed();
+		this.AddActionsToQueue(AscPDF.PDF_TRIGGERS_TYPES.MouseUp);
+
+		let oApi = oDoc.Api || Asc.editor;
+		if (oApi && oApi.sendEvent) {
+			let aRect = this.GetRect();
+			oApi.sendEvent("asc_onSignatureFieldClick", this.GetSignatureInfo(), aRect[2] - aRect[0], aRect[3] - aRect[1]);
+		}
     };
 
     CSignatureField.prototype.SetFilled = function(bValue) {
-        this._filled = bValue;
-        this.SetDrawHighlight(!bValue);
+		bValue = !!bValue;
+		if (this._filled === bValue) {
+			return;
+		}
+
+		this._filled = bValue;
+		this.SetDrawHighlight(!bValue);
+		this.SetNeedRecalc(true);
     };
     CSignatureField.prototype.IsFilled = function() {
         return this._filled;
@@ -106,6 +188,11 @@
      * @typeofeditors ["PDF"]
      */
     CSignatureField.prototype.SyncValue = function() {
+		let value = this.GetParentValue();
+		if (value !== undefined) {
+			this.SetFilled(isFilledValue(value));
+		}
+		this.SetNeedCommit(false);
     };
     /**
      * Applies value of this field to all field with the same name.
@@ -113,12 +200,69 @@
      * @typeofeditors ["PDF"]
      */
     CSignatureField.prototype.Commit = function() {
+		let oDoc = this.GetDocument();
+		let bFilled = this.IsFilled();
+		let sValue = bFilled ? SIGNED_VALUE : "";
+		let aFields = oDoc.GetAllWidgets(this.GetFullName());
+
+		this.SetParentValue(sValue);
+		for (let nIndex = 0; nIndex < aFields.length; nIndex++) {
+			aFields[nIndex].SetFilled(bFilled);
+			aFields[nIndex].SetWasChanged(true);
+			aFields[nIndex].SetNeedCommit(false);
+		}
     };
 
     CSignatureField.prototype.Reset = function() {
+		let bFilled = isFilledValue(this.GetDefaultValue());
+		if (bFilled === this.IsFilled()) {
+			return;
+		}
+
+		this.SetValue(bFilled);
+		this.Commit();
     };
+	CSignatureField.prototype.GetSignatureInfo = function() {
+		let oMeta = this.GetMeta() || {};
+		let oInfo = AscFormat.CSignatureLine ? new AscFormat.CSignatureLine() : {};
+		let sId = oMeta.signatureId || oMeta.guid || this.GetFullName() || String(this.GetApIdx());
+
+		oInfo.id = sId;
+		oInfo.signer = oMeta.signer || oMeta.signer1 || "";
+		oInfo.signer2 = oMeta.signer2 || "";
+		oInfo.email = oMeta.email || "";
+		oInfo.showDate = !!oMeta.showDate;
+		oInfo.instructions = oMeta.instructions || "";
+		oInfo.filled = this.IsFilled();
+		oInfo.page = this.GetPage();
+		oInfo.rect = this.GetRect().slice();
+		oInfo.isForm = true;
+		return oInfo;
+	};
 	
-    CSignatureField.prototype.WriteToBinary = function(memory) {};
+    CSignatureField.prototype.WriteToBinary = function(memory) {
+		memory.WriteByte(AscCommon.CommandType.ctAnnotField);
+
+		let nStartPos = memory.GetCurPosition();
+		memory.Skip(4);
+
+		this.WriteToBinaryBase(memory);
+		this.WriteToBinaryBase2(memory);
+		if (this.IsFilled()) {
+			memory.fieldDataFlags |= (1 << 9);
+		}
+
+		let nEndPos = memory.GetCurPosition();
+		memory.Seek(memory.posForWidgetFlags);
+		memory.WriteLong(memory.widgetFlags);
+		memory.Seek(memory.posForFieldDataFlags);
+		memory.WriteLong(memory.fieldDataFlags);
+		memory.Seek(nStartPos);
+		memory.WriteLong(nEndPos - nStartPos);
+		memory.Seek(nEndPos);
+
+		this.CheckWidgetFlags(memory);
+	};
     function MakeColorMoreGray(rgbColor, nPower) {
         // Get color component values
         const r = rgbColor.r;
@@ -139,5 +283,7 @@
     }
 
     window["AscPDF"].CSignatureField = CSignatureField;
+	window["AscPDF"].CSignatureField.prototype["asc_GetValue"] = CSignatureField.prototype.GetValue;
+	window["AscPDF"].CSignatureField.prototype["asc_IsFilled"] = CSignatureField.prototype.IsFilled;
 })();
 
