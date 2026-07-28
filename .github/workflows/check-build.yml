@@ -28,17 +28,9 @@ jobs:
           path: sdkjs-forms
           ref: 1a883281c41fa9aa5e98c64cce13b14782f92f56
 
-      - name: Use Node.js 20
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
       - name: Build SDKJS
         working-directory: sdkjs
-        run: |
-          npm install grunt-cli
-          npm install --prefix build
-          node node_modules/grunt-cli/bin/grunt --gruntfile build/Gruntfile.js
+        run: python build/build.py --mobile --addon ../sdkjs-forms
 
   locked-baseline-tests:
     runs-on: ubuntu-latest
