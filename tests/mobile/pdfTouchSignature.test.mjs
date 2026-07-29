@@ -681,6 +681,23 @@ test('PDF signature appearance API fails closed without a core persistence capab
     assert.equal(field.asc_SetAppearance, undefined);
 });
 
+test('PDF signature appearance capability reports the locked core persistence fact', () => {
+    const api = Object.create(loadPdfApiPrototype());
+
+    api.getPDFDoc = () => ({
+        IsSignatureAppearancePersistenceSupported: () => false,
+    });
+    assert.equal(api.asc_IsSignatureAppearancePersistenceSupported(), false);
+
+    api.getPDFDoc = () => ({
+        IsSignatureAppearancePersistenceSupported: () => true,
+    });
+    assert.equal(api.asc_IsSignatureAppearancePersistenceSupported(), true);
+
+    api.getPDFDoc = () => null;
+    assert.equal(api.asc_IsSignatureAppearancePersistenceSupported(), false);
+});
+
 test('PDF signature appearance API separates form-field and certificate signature updates', () => {
     const history = {historydescription_Pdf_FieldCommit: 9};
     const api = Object.create(loadPdfApiPrototype({history}));

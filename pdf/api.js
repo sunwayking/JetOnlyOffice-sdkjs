@@ -3705,6 +3705,11 @@
 		}
 		return bApplied;
 	};
+	PDFEditorApi.prototype.asc_IsSignatureAppearancePersistenceSupported = function() {
+		let oDoc = this.getPDFDoc();
+		return !!(oDoc && typeof oDoc.IsSignatureAppearancePersistenceSupported === "function" &&
+			oDoc.IsSignatureAppearancePersistenceSupported());
+	};
 
 	PDFEditorApi.prototype.getPluginContextMenuInfo = function () {
 		let oDoc		= this.getPDFDoc();
@@ -5684,6 +5689,7 @@
 	PDFEditorApi.prototype['asc_getAllSignatures']		= PDFEditorApi.prototype.asc_getAllSignatures;
 	PDFEditorApi.prototype['asc_getRequestSignatures']	= PDFEditorApi.prototype.asc_getRequestSignatures;
 	PDFEditorApi.prototype['asc_SetSignatureFieldAppearance'] = PDFEditorApi.prototype.asc_SetSignatureFieldAppearance;
+	PDFEditorApi.prototype['asc_IsSignatureAppearancePersistenceSupported'] = PDFEditorApi.prototype.asc_IsSignatureAppearancePersistenceSupported;
 	PDFEditorApi.prototype['asc_setPdfViewer']		        = PDFEditorApi.prototype.asc_setPdfViewer;
 
 	PDFEditorApi.prototype['asc_GetTableOfContentsPr']      = PDFEditorApi.prototype.asc_GetTableOfContentsPr;
