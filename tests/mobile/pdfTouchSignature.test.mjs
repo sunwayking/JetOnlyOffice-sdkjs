@@ -698,6 +698,57 @@ test('PDF signature appearance capability reports the locked core persistence fa
     assert.equal(api.asc_IsSignatureAppearancePersistenceSupported(), false);
 });
 
+test('PDF permanent redaction API reports native content removal and applied-save facts', () => {
+    const document = Object.create(loadPdfDocumentPrototype());
+    document.Viewer = {file: {nativeFile: {RedactPage() {}}}};
+    Object.defineProperty(document, 'annots', {
+        value: [{IsRedact: () => true, GetRedactId: () => 'redact-1'}],
+    });
+
+    assert.equal(document.IsPermanentRedactionSupported(), true);
+    assert.equal(document.HasAppliedRedact(), true);
+
+    document.Viewer.file.nativeFile = {};
+    assert.equal(document.IsPermanentRedactionSupported(), false);
+
+    const api = Object.create(loadPdfApiPrototype());
+    api.getPDFDoc = () => document;
+    assert.equal(api.asc_IsPermanentRedactionSupported(), false);
+    assert.equal(api.asc_HasAppliedRedaction(), true);
+
+    api.getPDFDoc = () => null;
+    assert.equal(api.asc_IsPermanentRedactionSupported(), false);
+    assert.equal(api.asc_HasAppliedRedaction(), false);
+});
+
+test('PDF redaction apply refuses marks when native content removal is unavailable', () => {
+    const api = Object.create(loadPdfApiPrototype());
+    let actionCount = 0;
+    api.getPDFDoc = () => ({
+        IsPermanentRedactionSupported: () => false,
+        DoAction() {
+            actionCount += 1;
+        },
+    });
+
+    assert.equal(api.ApplyRedact(), false);
+    assert.equal(actionCount, 0);
+
+    let applyCount = 0;
+    api.getPDFDoc = () => ({
+        IsPermanentRedactionSupported: () => true,
+        ApplyRedact() {
+            applyCount += 1;
+        },
+        DoAction(action) {
+            action();
+            return true;
+        },
+    });
+    assert.equal(api.ApplyRedact(), true);
+    assert.equal(applyCount, 1);
+});
+
 test('PDF signature appearance API separates form-field and certificate signature updates', () => {
     const history = {historydescription_Pdf_FieldCommit: 9};
     const api = Object.create(loadPdfApiPrototype({history}));

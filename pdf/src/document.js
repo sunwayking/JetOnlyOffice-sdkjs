@@ -7684,6 +7684,10 @@ var CPresentation = CPresentation || function(){};
 			return annot.IsRedact() && annot.GetRedactId();
 		});
 	};
+    CPDFDoc.prototype.IsPermanentRedactionSupported = function() {
+        let oNativeFile = this.Viewer && this.Viewer.file && this.Viewer.file.nativeFile;
+        return !!(oNativeFile && typeof oNativeFile["RedactPage"] === "function");
+    };
     CPDFDoc.prototype.ApplyRedact = function(sRedactId, nPage) {
         let oFile = this.Viewer.file;
 		let oNativeFile = oFile.nativeFile;
