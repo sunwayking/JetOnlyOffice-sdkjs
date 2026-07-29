@@ -1475,10 +1475,22 @@
 	};
 	PDFEditorApi.prototype.ApplyRedact = function() {
 		let oDoc = this.getPDFDoc();
+		if (!oDoc || !oDoc.IsPermanentRedactionSupported || !oDoc.IsPermanentRedactionSupported()) {
+			return false;
+		}
 		
 		return oDoc.DoAction(function() {
 			oDoc.ApplyRedact()
 		}, AscDFH.historydescription_Pdf_Apply_Redact);
+	};
+	PDFEditorApi.prototype.asc_IsPermanentRedactionSupported = function() {
+		let oDoc = this.getPDFDoc();
+		return !!(oDoc && typeof oDoc.IsPermanentRedactionSupported === "function" &&
+			oDoc.IsPermanentRedactionSupported());
+	};
+	PDFEditorApi.prototype.asc_HasAppliedRedaction = function() {
+		let oDoc = this.getPDFDoc();
+		return !!(oDoc && typeof oDoc.HasAppliedRedact === "function" && oDoc.HasAppliedRedact());
 	};
 
 	PDFEditorApi.prototype.HasRedact = function() {
@@ -5559,6 +5571,8 @@
 	PDFEditorApi.prototype['IsRedactTool']		= PDFEditorApi.prototype.IsRedactTool;
 	PDFEditorApi.prototype['RedactPages']		= PDFEditorApi.prototype.RedactPages;
 	PDFEditorApi.prototype['ApplyRedact']		= PDFEditorApi.prototype.ApplyRedact;
+	PDFEditorApi.prototype['asc_IsPermanentRedactionSupported'] = PDFEditorApi.prototype.asc_IsPermanentRedactionSupported;
+	PDFEditorApi.prototype['asc_HasAppliedRedaction'] = PDFEditorApi.prototype.asc_HasAppliedRedaction;
 	PDFEditorApi.prototype['HasRedact']			= PDFEditorApi.prototype.HasRedact;
 	PDFEditorApi.prototype['RemoveAllRedact']	= PDFEditorApi.prototype.RemoveAllRedact;
 	PDFEditorApi.prototype['AddRedactBySelect']	= PDFEditorApi.prototype.AddRedactBySelect;
