@@ -58,7 +58,6 @@
 		this.Temporary = false;
 		this.Ligatures = Asc.LigaturesType.None;
 		this.Spacing   = 0;
-		this.AscFont   = false; // Специальный случай, когда используемый шрифт ASCW3, а не тот, что задан в настройках
 		
 		this.MaskSymbol = null; // Символ, который используется для маскирования текста в полях ввода
 	}
@@ -73,7 +72,6 @@
 		this.Temporary = isTemporary;
 		this.Ligatures = Asc.LigaturesType.None;
 		this.Spacing   = 0;
-		this.AscFont   = false;
 		
 		this.ClearBuffer();
 	};
@@ -96,8 +94,6 @@
 
 		let oFontInfo = this.TextPr.GetFontInfo(nFontSlot);
 
-		if (this.AscFont)
-			oFontInfo.Name = "ASCW3";
 
 		return oFontInfo;
 	};
@@ -245,7 +241,6 @@
 		this.TextPr    = oTextPr;
 		this.Spacing   = isCombForm ? 0 : oTextPr.Spacing;
 		this.Ligatures = isCombForm || Math.abs(this.Spacing) > 0.001 ? Asc.LigaturesType.None : oTextPr.Ligatures;
-		this.AscFont   = oRun.IsUseAscFont(oTextPr);
 	};
 	CParagraphTextShaper.prototype.private_HandleNBSP = function(oItem)
 	{

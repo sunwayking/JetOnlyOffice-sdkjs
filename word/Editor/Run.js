@@ -3351,11 +3351,6 @@ ParaRun.prototype.Recalculate_MeasureContent = function()
 	var oTheme  = this.Paragraph.GetTheme();
 
 	let _oTextPr = oTextPr;
-	if (this.IsUseAscFont(oTextPr))
-	{
-		_oTextPr = oTextPr.Copy();
-		_oTextPr.RFonts.SetAll("ASCW3");
-	}
 	
 	g_oTextMeasurer.SetTextPr(_oTextPr, oTheme);
 	
@@ -3469,11 +3464,6 @@ ParaRun.prototype.Recalculate_MeasureContent = function()
 ParaRun.prototype.getTextMetrics = function(isForceEmpty)
 {
 	let textPr = this.Get_CompiledPr(false);
-	if (this.IsUseAscFont(textPr))
-	{
-		textPr = textPr.Copy();
-		textPr.RFonts.SetAll("ASCW3");
-	}
 	
 	// TODO: Пока для формул сделаем, чтобы работало по-старому, в дальнейшем надо будет переделать на fontslot
 	let fontSlot = this.IsMathRun() ? AscWord.fontslot_ASCII : AscWord.fontslot_None;
@@ -5073,11 +5063,6 @@ ParaRun.prototype.Recalculate_LineMetrics = function(PRS, ParaPr, _CurLine, _Cur
 	var LineRule              = ParaPr.Spacing.LineRule;
 	
 	let textPr = this.Get_CompiledPr(false);
-	if (this.IsUseAscFont(textPr))
-	{
-		textPr = textPr.Copy();
-		textPr.RFonts.SetAll("ASCW3");
-	}
 	// TODO: Пока для формул сделаем, чтобы работало по-старому, в дальнейшем надо будет переделать на fontslot
 	let fontSlot = this.IsMathRun() ? AscWord.fontslot_ASCII : AscWord.fontslot_None;
 	
@@ -12424,13 +12409,6 @@ ParaRun.prototype.CalculateTextToTable = function(oEngine)
 			}
 		}
 	}
-};
-ParaRun.prototype.IsUseAscFont = function(oTextPr)
-{
-	return (1 === this.Content.length
-		&& para_Text === this.Content[0].Type
-		&& this.IsInCheckBox()
-		&& AscCommon.IsAscFontSupport(oTextPr.RFonts.Ascii.Name, this.Content[0].Value));
 };
 /**
  * Получаем предыдущий элемент, с учетом предыдущих классов внутри параграфа

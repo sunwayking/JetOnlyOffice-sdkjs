@@ -10895,20 +10895,6 @@
 		return !!(AscCommon.g_aPunctuation[unicode])
 	}
 
-	/**
-	 * Checks if the character of the given font is present in the ASCW3 font
-	 * @param sFontFamily
-	 * @param nUnicode
-	 * @returns {boolean}
-	 */
-	function IsAscFontSupport(sFontFamily, nUnicode)
-	{
-		return ("Segoe UI Symbol" === sFontFamily
-			&& (0x25C9 === nUnicode
-				|| 0x25CB === nUnicode
-				|| 0x2611 === nUnicode
-				|| 0x2610 === nUnicode));
-	}
 	
 	function ExecuteNoHistory(f, oLogicDocument, oThis, args)
 	{
@@ -15711,7 +15697,6 @@
 	window["AscCommon"].IsLetter = IsLetter;
 	window["AscCommon"].IsPunctuation = window["AscCommon"]['IsPunctuation'] = IsPunctuation;
 	window["AscCommon"].CorrectFontSize = CorrectFontSize;
-	window["AscCommon"].IsAscFontSupport = IsAscFontSupport;
 	window["AscCommon"].ExecuteNoHistory = ExecuteNoHistory;
 	window["AscCommon"].executeNoRevisions = executeNoRevisions;
 	window["AscCommon"].executeNoPreDelete = executeNoPreDelete;

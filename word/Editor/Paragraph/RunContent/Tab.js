@@ -43,21 +43,14 @@ var tab_Num     = Asc.c_oAscTabType.Num;
 var tab_Right   = Asc.c_oAscTabType.Right;
 var tab_Left    = Asc.c_oAscTabType.Left;
 
-let tab_Symbol     = 0x0022;//0x2192;
-let tab_Symbol_Rtl = 0x0021;
+let tab_Symbol     = 0x2192;
+let tab_Symbol_Rtl = 0x2190;
 
 (function(window)
 {
-	let tabWidth = null;
-	
-	function getTabActualWidth(tabCode)
+	function getTabActualWidth(tabCode, Context)
 	{
-		if (null !== tabWidth)
-			return tabWidth;
-		
-		g_oTextMeasurer.SetFont({FontFamily : {Name : "ASCW3", Index : -1}, FontSize : 10, Italic : false, Bold : false});
-		tabWidth = g_oTextMeasurer.Measure(String.fromCharCode(tabCode)).Width;
-		return tabWidth;
+		return Context.Measure(String.fromCharCode(tabCode)).Width;
 	}
 
 	// TODO: Реализовать табы по точке и с чертой (tab_Bar tab_Decimal)
@@ -109,10 +102,9 @@ let tab_Symbol_Rtl = 0x0021;
 			Context.b_color1(0, 0, 0, 255);
 			
 			let tabCode = drawState.isRtlMainDirection() ? tab_Symbol_Rtl : tab_Symbol;
-			let tabActualWidth = getTabActualWidth(tabCode);
+			let tabActualWidth = getTabActualWidth(tabCode, Context);
 			var X0 = this.Width / 2 - tabActualWidth / 2;
 
-			Context.SetFont({FontFamily : {Name : "ASCW3", Index : -1}, FontSize : 10, Italic : false, Bold : false});
 
 			if (X0 > 0)
 				Context.FillText2(X + X0, Y, String.fromCharCode(tabCode), 0, this.Width);

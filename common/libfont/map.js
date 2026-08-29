@@ -1555,10 +1555,6 @@
 			 }
 			 */
 
-			// add ASCW3
-			var _fs = new CFontSelect();
-			_fs.m_wsFontName = "ASCW3";
-			this.List.push(_fs);
 
 			//delete window["g_fonts_selection_bin"];
 		},

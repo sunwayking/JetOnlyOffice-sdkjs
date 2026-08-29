@@ -2987,12 +2987,8 @@
 					nType = 0x0002;
 
 				var sCheckedFont = oCheckBoxPr.GetCheckedFont();
-				if (AscCommon.IsAscFontSupport(sCheckedFont, nCheckedSymbol))
-					sCheckedFont = "ASCW3";
 
 				var sUncheckedFont = oCheckBoxPr.GetUncheckedFont();
-				if (AscCommon.IsAscFontSupport(sUncheckedFont, nUncheckedSymbol))
-					sUncheckedFont = "ASCW3";
 
 				this.Memory.WriteLong(nType);
 				this.Memory.WriteLong(nCheckedSymbol);

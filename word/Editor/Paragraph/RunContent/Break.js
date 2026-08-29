@@ -97,14 +97,8 @@
 				case break_Line:
 				{
 					Context.b_color1(0, 0, 0, 255);
-					Context.SetFont({
-						FontFamily : {Name : "ASCW3", Index : -1},
-						FontSize   : 10,
-						Italic     : false,
-						Bold       : false
-					});
-					let code = drawState.isRtlMainDirection() ? 0x0039 : 0x0038;
-					Context.FillText(X, Y, String.fromCharCode(code/*0x21B5*/));
+					let code = drawState.isRtlMainDirection() ? 0x21B2 : 0x21B5;
+					Context.FillText(X, Y, String.fromCharCode(code));
 					break;
 				}
 				case break_Page:
@@ -151,11 +145,8 @@
 				this.Width  = 0;
 				this.Height = 0;
 
-				Context.SetFont({FontFamily : {Name : "ASCW3", Index : -1}, FontSize : 10, Italic : false, Bold : false});
-				var Temp = Context.Measure(String.fromCharCode(0x0038));
-
-				// Почему-то в шрифте Wingding 3 символ 0x0038 имеет неправильную ширину
-				this.WidthVisible = Temp.Width * 1.7;
+				var Temp = Context.Measure(String.fromCharCode(0x21B5));
+				this.WidthVisible = Temp.Width;
 
 				break;
 			}

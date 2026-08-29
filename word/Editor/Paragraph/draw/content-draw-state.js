@@ -257,7 +257,7 @@
 			this.autoColor = (bgColor && !bgColor.Check_BlackAutoColor() ? new CDocumentColor(255, 255, 255, false) : new CDocumentColor(0, 0, 0, false));
 		}
 		
-		this.updateGraphicsState(textPr, run.IsUseAscFont(textPr));
+		this.updateGraphicsState(textPr);
 		
 		this.calcY = this.calculateY(textPr);
 	};
@@ -265,17 +265,11 @@
 	 * @param textPr {AscWord.CTextPr}
 	 * @param [useAscFont=false] {boolean}
 	 */
-	ParagraphContentDrawState.prototype.updateGraphicsState = function(textPr, useAscFont)
+	ParagraphContentDrawState.prototype.updateGraphicsState = function(textPr)
 	{
 		if (textPr)
 		{
 			this.textPr = textPr;
-			
-			if (useAscFont)
-			{
-				textPr = textPr.Copy();
-				textPr.RFonts.SetAll("ASCW3", -1);
-			}
 			
 			this.Graphics.SetTextPr(textPr, this.Theme);
 		}
@@ -669,7 +663,6 @@
 				
 				if (true === editor.ShowParaMarks && (Asc.c_oAscNumberingSuff.Tab === nNumSuff || oNumLvl.IsLegacy()))
 				{
-					let tabSymbolWidth = 3.143; // ширина символа "стрелка влево" в шрифте Wingding3,10
 					let tabX = this.X;
 					
 					if (!isRtl)
@@ -680,14 +673,8 @@
 							tabX += numWidth / 2;
 					}
 					
-					graphics.SetFont({
-						FontFamily : {Name : "ASCW3", Index : -1},
-						FontSize   : 10,
-						Italic     : false,
-						Bold       : false
-					});
-					
 					let tabCode = isRtl ? tab_Symbol_Rtl : tab_Symbol;
+					let tabSymbolWidth = graphics.Measure(String.fromCharCode(tabCode)).Width;
 					if (suffWidth > tabSymbolWidth)
 						graphics.FillText2(tabX + suffWidth / 2 - tabSymbolWidth / 2, Y, String.fromCharCode(tabCode), 0, suffWidth);
 					else if (isRtl)

@@ -10397,17 +10397,9 @@ background-repeat: no-repeat;\
 		var sUncheckedFont   = oPr && oPr.UncheckedFont ? oPr && oPr.UncheckedFont : Asc.c_oAscSdtCheckBoxDefaults.UncheckedFont;
 
 		var isLoadFonts = false;
-		if (!AscCommon.IsAscFontSupport(sCheckedFont, nCheckedSymbol))
-		{
-			isLoadFonts = true;
-			AscFonts.FontPickerByCharacter.getFontBySymbol(nCheckedSymbol);
-		}
-
-		if (!AscCommon.IsAscFontSupport(sUncheckedFont, nUncheckedSymbol))
-		{
-			isLoadFonts = true;
-			AscFonts.FontPickerByCharacter.getFontBySymbol(nUncheckedSymbol);
-		}
+		isLoadFonts = true;
+		AscFonts.FontPickerByCharacter.getFontBySymbol(nCheckedSymbol);
+		AscFonts.FontPickerByCharacter.getFontBySymbol(nUncheckedSymbol);
 
 		function private_PerformAddCheckBox()
 		{
@@ -10982,17 +10974,9 @@ background-repeat: no-repeat;\
 		var sUncheckedFont   = oPr.UncheckedFont ? oPr.UncheckedFont : Asc.c_oAscSdtCheckBoxDefaults.UncheckedFont;
 
 		var isLoadFonts = false;
-		if (!AscCommon.IsAscFontSupport(sCheckedFont, nCheckedSymbol))
-		{
-			isLoadFonts = true;
-			AscFonts.FontPickerByCharacter.getFontBySymbol(nCheckedSymbol);
-		}
-
-		if (!AscCommon.IsAscFontSupport(sUncheckedFont, nUncheckedSymbol))
-		{
-			isLoadFonts = true;
-			AscFonts.FontPickerByCharacter.getFontBySymbol(nUncheckedSymbol);
-		}
+		isLoadFonts = true;
+		AscFonts.FontPickerByCharacter.getFontBySymbol(nCheckedSymbol);
+		AscFonts.FontPickerByCharacter.getFontBySymbol(nUncheckedSymbol);
 
 		function private_PeformSetCheckBoxPr()
 		{
